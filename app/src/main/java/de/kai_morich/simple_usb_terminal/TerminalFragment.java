@@ -258,9 +258,16 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.sendBreak) {
             try {
                 usbSerialPort.setBreak(true);
-                Thread.sleep(100);
                 status("send BREAK");
-                usbSerialPort.setBreak(false);
+                mainLooper.postDelayed(() -> {
+                    try {
+                        if (usbSerialPort != null) {
+                            usbSerialPort.setBreak(false);
+                        }
+                    } catch (Exception e) {
+                        status("clear BREAK failed: " + e.getMessage());
+                    }
+                }, 100);
             } catch (Exception e) {
                 status("send BREAK failed: " + e.getMessage());
             }
