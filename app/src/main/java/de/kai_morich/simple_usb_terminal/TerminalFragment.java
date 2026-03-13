@@ -30,7 +30,9 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageButton;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
@@ -64,7 +66,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private TextView receiveText;
     private TextView sendText;
+    private EditText characterInput;
     private ImageButton sendBtn;
+    private View sendPanel;
     private TextUtil.HexWatcher hexWatcher;
     private TextWatcher characterModeWatcher;
 
@@ -187,7 +191,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         receiveText.setTextColor(getResources().getColor(R.color.colorRecieveText)); // set as default color to reduce number of spans
         receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
 
+        sendPanel = view.findViewById(R.id.send_panel);
         sendText = view.findViewById(R.id.send_text);
+        characterInput = view.findViewById(R.id.character_input);
         sendBtn = view.findViewById(R.id.send_btn);
         hexWatcher = new TextUtil.HexWatcher(sendText);
         hexWatcher.enable(hexEnabled);
@@ -216,7 +222,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
         };
-        sendText.addTextChangedListener(characterModeWatcher);
+        characterInput.addTextChangedListener(characterModeWatcher);
         updateInputModeUi();
 
         View sendBtn = view.findViewById(R.id.send_btn);
@@ -250,6 +256,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             return true;
         } else if (id == R.id.characterMode) {
             characterMode = !characterMode;
+            if (characterMode && hexEnabled) {
+                hexEnabled = false;
+                sendText.setText("");
+                hexWatcher.enable(false);
+            }
             item.setChecked(characterMode);
             updateInputModeUi();
             return true;
@@ -484,7 +495,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void updateInputModeUi() {
-        if (sendText == null || sendBtn == null) {
+        if (sendText == null || sendBtn == null || sendPanel == null || characterInput == null) {
             return;
         }
         if (hexEnabled) {
@@ -493,6 +504,30 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             sendText.setHint("Character mode");
         } else {
             sendText.setHint("");
+        }
+        sendPanel.setVisibility(characterMode ? View.GONE : View.VISIBLE);
+        if (characterMode && !hexEnabled) {
+            characterInput.setText("");
+            characterInput.requestFocus();
+            showSoftKeyboard(characterInput);
+        } else {
+            characterInput.setText("");
+            characterInput.clearFocus();
+            hideSoftKeyboard(characterInput);
+        }
+    }
+
+    private void showSoftKeyboard(View view) {
+        InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
+        }
+    }
+
+    private void hideSoftKeyboard(View view) {
+        InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
     }
 

@@ -2,6 +2,7 @@
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/terminal_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -100,6 +101,7 @@
         android:layout_height="2dp" />
 
     <LinearLayout
+        android:id="@+id/send_panel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
@@ -118,6 +120,17 @@
             android:layout_height="wrap_content"
             app:srcCompat="@drawable/ic_send_white_24dp" />
     </LinearLayout>
+
+    <EditText
+        android:id="@+id/character_input"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:alpha="0"
+        android:background="@android:color/transparent"
+        android:cursorVisible="false"
+        android:importantForAutofill="no"
+        android:inputType="text|textNoSuggestions"
+        android:textColor="@android:color/transparent" />
 
 </LinearLayout>
 
