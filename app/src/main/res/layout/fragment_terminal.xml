@@ -123,14 +123,13 @@
 
     <EditText
         android:id="@+id/character_input"
-        android:layout_width="1dp"
-        android:layout_height="1dp"
-        android:alpha="0"
-        android:background="@android:color/transparent"
-        android:cursorVisible="false"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:hint="Character mode"
         android:importantForAutofill="no"
-        android:inputType="text|textNoSuggestions"
-        android:textColor="@android:color/transparent" />
+        android:imeOptions="flagNoExtractUi"
+        android:inputType="text|textCapSentences|textMultiLine|textNoSuggestions" />
 
 </LinearLayout>
 

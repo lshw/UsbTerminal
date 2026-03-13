@@ -18,6 +18,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.text.Selection;
 import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -30,6 +31,8 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.BaseInputConnection;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageButton;
 import android.widget.EditText;
@@ -49,6 +52,7 @@ import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.hoho.android.usbserial.util.XonXoffFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -228,15 +232,29 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 if (selfChange || !characterMode || s.length() == 0) {
                     return;
                 }
+                if (BaseInputConnection.getComposingSpanStart(s) != -1 || BaseInputConnection.getComposingSpanEnd(s) != -1) {
+                    return;
+                }
                 if (!hexEnabled && connected == Connected.True) {
                     send(s.toString(), false);
-                    selfChange = true;
-                    s.clear();
-                    selfChange = false;
                 }
+                selfChange = true;
+                s.clear();
+                selfChange = false;
             }
         };
         characterInput.addTextChangedListener(characterModeWatcher);
+        characterInput.setOnEditorActionListener((TextView v, int actionId, android.view.KeyEvent event) -> {
+            if (!characterMode || hexEnabled || characterInput.getText().length() == 0) {
+                return false;
+            }
+            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_SEND) {
+                send(characterInput.getText().toString(), false);
+                characterInput.getText().clear();
+                return true;
+            }
+            return false;
+        });
         updateInputModeUi();
 
         View sendBtn = view.findViewById(R.id.send_btn);
@@ -434,7 +452,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             data = TextUtil.fromHexString(msg);
         } else {
             msg = str;
-            data = appendNewline ? (str + newline).getBytes() : str.getBytes();
+            data = appendNewline ? (str + newline).getBytes(StandardCharsets.UTF_8) : str.getBytes(StandardCharsets.UTF_8);
         }
         try {
             SpannableStringBuilder spn = new SpannableStringBuilder(msg + '\n');
@@ -581,13 +599,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (hexEnabled) {
             sendText.setHint("HEX mode");
         } else if (characterMode) {
-            sendText.setHint("Character mode");
+            characterInput.setHint("Character mode");
+            characterInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         } else {
             sendText.setHint("");
         }
         sendPanel.setVisibility(characterMode ? View.GONE : View.VISIBLE);
+        characterInput.setVisibility(characterMode && !hexEnabled ? View.VISIBLE : View.GONE);
         if (characterMode && !hexEnabled) {
-            characterInput.setText("");
+            if (characterInput.getText() != null && characterInput.getText().length() > 0) {
+                Selection.setSelection(characterInput.getText(), characterInput.getText().length());
+            }
             characterInput.requestFocus();
             showSoftKeyboard(characterInput);
         } else {
@@ -600,7 +622,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private void showSoftKeyboard(View view) {
         InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) {
-            imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
+            view.post(() -> {
+                view.requestFocus();
+                imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
+            });
         }
     }
 
