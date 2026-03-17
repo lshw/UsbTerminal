@@ -64,7 +64,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private final Handler mainLooper;
     private final BroadcastReceiver broadcastReceiver;
-    private int deviceId, portNum, baudRate;
+    private int deviceId, vendorId, productId, portNum, baudRate;
     private UsbSerialPort usbSerialPort;
     private SerialService service;
 
@@ -80,6 +80,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private boolean initialStart = true;
     private boolean characterMode = true;
     private boolean hexEnabled = false;
+    private boolean reconnectPending = false;
     private enum SendButtonState {Idle, Busy, Disabled};
 
     private ControlLines controlLines = new ControlLines();
@@ -95,9 +96,22 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         broadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                if(Constants.INTENT_ACTION_GRANT_USB.equals(intent.getAction())) {
+                String action = intent.getAction();
+                if(Constants.INTENT_ACTION_GRANT_USB.equals(action)) {
                     Boolean granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
                     connect(granted);
+                } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
+                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    if (matchesDevice(device) && connected != Connected.False) {
+                        status("USB device detached");
+                        disconnect(true);
+                    }
+                } else if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
+                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    if (matchesDevice(device) && reconnectPending && connected == Connected.False) {
+                        status("USB device attached, reconnecting");
+                        mainLooper.post(() -> connect(null));
+                    }
                 }
             }
         };
@@ -112,6 +126,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         setHasOptionsMenu(true);
         setRetainInstance(true);
         deviceId = getArguments().getInt("device");
+        vendorId = getArguments().getInt("vendor", -1);
+        productId = getArguments().getInt("product", -1);
         portNum = getArguments().getInt("port");
         baudRate = getArguments().getInt("baud");
     }
@@ -119,7 +135,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onDestroy() {
         if (connected != Connected.False)
-            disconnect();
+            disconnect(false);
         getActivity().stopService(new Intent(getActivity(), SerialService.class));
         super.onDestroy();
     }
@@ -132,6 +148,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         else
             getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
         ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_NOT_EXPORTED);
+        ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED), ContextCompat.RECEIVER_NOT_EXPORTED);
+        ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED), ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     @Override
@@ -366,15 +384,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void connect(Boolean permissionGranted) {
-        UsbDevice device = null;
         UsbManager usbManager = (UsbManager) getActivity().getSystemService(Context.USB_SERVICE);
-        for(UsbDevice v : usbManager.getDeviceList().values())
-            if(v.getDeviceId() == deviceId)
-                device = v;
+        UsbDevice device = findDevice(usbManager);
         if(device == null) {
             status("connection failed: device not found");
             return;
         }
+        deviceId = device.getDeviceId();
+        vendorId = device.getVendorId();
+        productId = device.getProductId();
         UsbSerialDriver driver = UsbSerialProber.getDefaultProber().probeDevice(device);
         if(driver == null) {
             driver = CustomProber.getCustomProber().probeDevice(device);
@@ -415,6 +433,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             }
             SerialSocket socket = new SerialSocket(getActivity().getApplicationContext(), usbConnection, usbSerialPort);
             service.connect(socket);
+            reconnectPending = false;
             // usb connect is not asynchronous. connect-success and connect-error are returned immediately from socket.connect
             // for consistency to bluetooth/bluetooth-LE app use same SerialListener and SerialService classes
             onSerialConnect();
@@ -423,12 +442,38 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
-    private void disconnect() {
+    private void disconnect(boolean reconnectExpected) {
         connected = Connected.False;
+        reconnectPending = reconnectExpected;
         controlLines.stop();
         service.disconnect();
         updateSendBtn(SendButtonState.Idle);
         usbSerialPort = null;
+    }
+
+    private UsbDevice findDevice(UsbManager usbManager) {
+        UsbDevice fallback = null;
+        for (UsbDevice device : usbManager.getDeviceList().values()) {
+            if (device.getDeviceId() == deviceId) {
+                return device;
+            }
+            if (fallback == null && matchesDevice(device)) {
+                fallback = device;
+            }
+        }
+        return fallback;
+    }
+
+    private boolean matchesDevice(UsbDevice device) {
+        if (device == null) {
+            return false;
+        }
+        if (device.getDeviceId() == deviceId) {
+            return true;
+        }
+        return vendorId != -1 && productId != -1
+                && device.getVendorId() == vendorId
+                && device.getProductId() == productId;
     }
 
     private void send(String str) {
@@ -668,7 +713,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onSerialConnectError(Exception e) {
         status("connection failed: " + e.getMessage());
-        disconnect();
+        disconnect(true);
     }
 
     @Override
@@ -685,7 +730,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onSerialIoError(Exception e) {
         status("connection lost: " + e.getMessage());
-        disconnect();
+        disconnect(true);
     }
 
     class ControlLines {

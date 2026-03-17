@@ -143,6 +143,8 @@ public class DevicesFragment extends ListFragment {
         } else {
             Bundle args = new Bundle();
             args.putInt("device", item.device.getDeviceId());
+            args.putInt("vendor", item.device.getVendorId());
+            args.putInt("product", item.device.getProductId());
             args.putInt("port", item.port);
             args.putInt("baud", baudRate);
             Fragment fragment = new TerminalFragment();
