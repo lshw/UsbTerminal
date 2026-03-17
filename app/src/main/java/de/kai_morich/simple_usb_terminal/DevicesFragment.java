@@ -110,6 +110,9 @@ public class DevicesFragment extends ListFragment {
             });
             builder.create().show();
             return true;
+        } else if (id == R.id.about) {
+            ((MainActivity) requireActivity()).showAboutDialog();
+            return true;
         } else {
             return super.onOptionsItemSelected(item);
         }

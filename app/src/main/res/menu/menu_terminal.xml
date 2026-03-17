@@ -38,4 +38,8 @@
         android:id="@+id/sendBreak"
         android:title="Send BREAK"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/about"
+        android:title="@string/about"
+        app:showAsAction="never" />
 </menu>

@@ -1,4 +1,10 @@
 <resources>
     <string name="app_name">Simple USB Terminal</string>
     <string name="devices">USB Devices</string>
+    <string name="about">About</string>
+    <string name="version_label">Version %1$s</string>
+    <string name="about_message">%1$s\n%2$s</string>
+    <string name="about_web">Web</string>
+    <string name="about_website_url">https://www.bjlx.org.cn</string>
+    <string name="about_open_web_failed">No browser available</string>
 </resources>

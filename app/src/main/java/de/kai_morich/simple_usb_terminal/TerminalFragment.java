@@ -372,6 +372,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 status("send BREAK failed: " + e.getMessage());
             }
             return true;
+        } else if (id == R.id.about) {
+            ((MainActivity) requireActivity()).showAboutDialog();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
