@@ -78,7 +78,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private Connected connected = Connected.False;
     private boolean initialStart = true;
-    private boolean characterMode = false;
+    private boolean characterMode = true;
     private boolean hexEnabled = false;
     private enum SendButtonState {Idle, Busy, Disabled};
 
