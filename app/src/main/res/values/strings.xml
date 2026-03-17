@@ -10,4 +10,11 @@
     <string name="about_website_url">https://www.bjlx.org.cn</string>
     <string name="about_product_url">https://h5.m.goofish.com/item?id=778177505610</string>
     <string name="about_open_web_failed">No browser available</string>
+    <string name="communication_log">保存通讯日志</string>
+    <string name="communication_log_enabled">通讯日志保存已开启: %1$s</string>
+    <string name="communication_log_disabled">通讯日志保存已关闭</string>
+    <string name="communication_log_enable_failed">通讯日志保存开启失败</string>
+    <string name="communication_log_write_failed">通讯日志写入失败: %1$s</string>
+    <string name="logs_open">浏览日志目录</string>
+    <string name="logs_open_failed">无法打开日志目录</string>
 </resources>

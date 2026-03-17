@@ -5,9 +5,12 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.widget.Toast;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.FragmentManager;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+
+import java.io.File;
 
 public class MainActivity extends AppCompatActivity implements FragmentManager.OnBackStackChangedListener {
 
@@ -65,6 +68,23 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
             startActivity(intent);
         } catch (Exception e) {
             Toast.makeText(this, R.string.about_open_web_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    void openLogsDirectory() {
+        File logsDir = LogFiles.getLogsDir(this);
+        if (logsDir == null) {
+            Toast.makeText(this, R.string.logs_open_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Uri uri = FileProvider.getUriForFile(this, BuildConfig.APPLICATION_ID + ".fileprovider", logsDir);
+        Intent intent = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "*/*")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            startActivity(Intent.createChooser(intent, getString(R.string.logs_open)));
+        } catch (Exception e) {
+            Toast.makeText(this, R.string.logs_open_failed, Toast.LENGTH_SHORT).show();
         }
     }
 

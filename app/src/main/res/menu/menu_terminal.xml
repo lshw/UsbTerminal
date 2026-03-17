@@ -21,6 +21,15 @@
         android:checkable="true"
         app:showAsAction="never" />
     <item
+        android:id="@+id/communicationLog"
+        android:title="@string/communication_log"
+        android:checkable="true"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/openLogs"
+        android:title="@string/logs_open"
+        app:showAsAction="ifRoom" />
+    <item
         android:id="@+id/controlLines"
         android:title="Control Lines"
         android:checkable="true"

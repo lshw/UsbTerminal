@@ -9,6 +9,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
@@ -51,16 +52,25 @@ import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 import com.hoho.android.usbserial.util.XonXoffFilter;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.EnumSet;
+import java.util.Locale;
 
 public class TerminalFragment extends Fragment implements ServiceConnection, SerialListener {
 
     private enum Connected { False, Pending, True }
+    private static final String PREFS_NAME = "terminal";
+    private static final String PREF_COMM_LOG_ENABLED = "comm_log_enabled";
 
     private final Handler mainLooper;
     private final BroadcastReceiver broadcastReceiver;
@@ -82,6 +92,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private boolean hexEnabled = false;
     private boolean reconnectPending = false;
     private enum SendButtonState {Idle, Busy, Disabled};
+    private boolean commLogEnabled;
+    private File commLogFile;
+    private BufferedWriter commLogWriter;
 
     private ControlLines controlLines = new ControlLines();
     private XonXoffFilter flowControlFilter;
@@ -130,10 +143,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         productId = getArguments().getInt("product", -1);
         portNum = getArguments().getInt("port");
         baudRate = getArguments().getInt("baud");
+        SharedPreferences preferences = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        commLogEnabled = preferences.getBoolean(PREF_COMM_LOG_ENABLED, false);
     }
 
     @Override
     public void onDestroy() {
+        closeCommunicationLog();
         if (connected != Connected.False)
             disconnect(false);
         getActivity().stopService(new Intent(getActivity(), SerialService.class));
@@ -289,6 +305,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onPrepareOptionsMenu(@NonNull Menu menu) {
         menu.findItem(R.id.characterMode).setChecked(characterMode);
         menu.findItem(R.id.hex).setChecked(hexEnabled);
+        menu.findItem(R.id.communicationLog).setChecked(commLogEnabled);
         controlLines.onPrepareOptionsMenu(menu);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             menu.findItem(R.id.backgroundNotification).setChecked(service != null && service.areNotificationsEnabled());
@@ -337,6 +354,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             hexWatcher.enable(hexEnabled);
             updateInputModeUi();
             item.setChecked(hexEnabled);
+            return true;
+        } else if (id == R.id.communicationLog) {
+            setCommunicationLogEnabled(!commLogEnabled);
+            item.setChecked(commLogEnabled);
+            return true;
+        } else if (id == R.id.openLogs) {
+            ((MainActivity) requireActivity()).openLogsDirectory();
             return true;
         } else if (id == R.id.controlLines) {
             item.setChecked(controlLines.showControlLines(!item.isChecked()));
@@ -506,6 +530,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             SpannableStringBuilder spn = new SpannableStringBuilder(msg + '\n');
             spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorSendText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             receiveText.append(spn);
+            appendCommunicationLog("TX", data);
             service.write(data);
         } catch (SerialTimeoutException e) { // e.g. writing large data at low baud rate or suspended by flow control
             mainLooper.post(() -> sendAgain(data, e.bytesTransferred));
@@ -567,6 +592,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     spn.append(TextUtil.toCaretString(msg, newline.length() != 0));
                 }
             }
+            appendCommunicationLog("RX", data);
         }
         receiveText.append(spn);
     }
@@ -632,6 +658,107 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         SpannableStringBuilder spn = new SpannableStringBuilder(str + '\n');
         spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorStatusText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         receiveText.append(spn);
+    }
+
+    private void setCommunicationLogEnabled(boolean enabled) {
+        commLogEnabled = enabled;
+        SharedPreferences preferences = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        preferences.edit().putBoolean(PREF_COMM_LOG_ENABLED, enabled).apply();
+        if (enabled) {
+            if (openCommunicationLog()) {
+                status(getString(R.string.communication_log_enabled, commLogFile.getAbsolutePath()));
+            } else {
+                commLogEnabled = false;
+                preferences.edit().putBoolean(PREF_COMM_LOG_ENABLED, false).apply();
+                status(getString(R.string.communication_log_enable_failed));
+            }
+        } else {
+            closeCommunicationLog();
+            status(getString(R.string.communication_log_disabled));
+        }
+    }
+
+    private boolean openCommunicationLog() {
+        if (commLogWriter != null) {
+            return true;
+        }
+        File directory = LogFiles.getLogsDir(requireContext());
+        if (directory == null) {
+            return false;
+        }
+        String fileName = "comm-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date()) + ".log";
+        commLogFile = new File(directory, fileName);
+        try {
+            commLogWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(commLogFile, true), StandardCharsets.UTF_8));
+            commLogWriter.write("# SimpleUsbTerminal communication log");
+            commLogWriter.newLine();
+            commLogWriter.write("# created=" + formatTimestamp(System.currentTimeMillis()));
+            commLogWriter.newLine();
+            commLogWriter.write("# baudRate=" + baudRate);
+            commLogWriter.newLine();
+            commLogWriter.flush();
+            return true;
+        } catch (IOException e) {
+            commLogFile = null;
+            commLogWriter = null;
+            return false;
+        }
+    }
+
+    private void closeCommunicationLog() {
+        if (commLogWriter == null) {
+            commLogFile = null;
+            return;
+        }
+        try {
+            commLogWriter.flush();
+            commLogWriter.close();
+        } catch (IOException ignored) {
+        } finally {
+            commLogWriter = null;
+            commLogFile = null;
+        }
+    }
+
+    private void appendCommunicationLog(String direction, byte[] data) {
+        if (!commLogEnabled) {
+            return;
+        }
+        if (!openCommunicationLog()) {
+            status(getString(R.string.communication_log_enable_failed));
+            commLogEnabled = false;
+            requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_COMM_LOG_ENABLED, false)
+                    .apply();
+            requireActivity().invalidateOptionsMenu();
+            return;
+        }
+        String text = new String(data, StandardCharsets.UTF_8)
+                .replace("\r", "\\r")
+                .replace("\n", "\\n");
+        try {
+            commLogWriter.write(formatTimestamp(System.currentTimeMillis())
+                    + " " + direction
+                    + " len=" + data.length
+                    + " text=" + text
+                    + " hex=" + TextUtil.toHexString(data));
+            commLogWriter.newLine();
+            commLogWriter.flush();
+        } catch (IOException e) {
+            closeCommunicationLog();
+            commLogEnabled = false;
+            requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_COMM_LOG_ENABLED, false)
+                    .apply();
+            status(getString(R.string.communication_log_write_failed, e.getMessage()));
+            requireActivity().invalidateOptionsMenu();
+        }
+    }
+
+    private String formatTimestamp(long timestamp) {
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(new Date(timestamp));
     }
 
     void updateSendBtn(SendButtonState state) {

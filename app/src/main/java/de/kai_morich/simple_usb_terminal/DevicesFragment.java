@@ -110,6 +110,9 @@ public class DevicesFragment extends ListFragment {
             });
             builder.create().show();
             return true;
+        } else if (id == R.id.openLogs) {
+            ((MainActivity) requireActivity()).openLogsDirectory();
+            return true;
         } else if (id == R.id.about) {
             ((MainActivity) requireActivity()).showAboutDialog();
             return true;
