@@ -153,7 +153,7 @@ public class SerialService extends Service implements SerialListener {
 
     private void initNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel nc = new NotificationChannel(Constants.NOTIFICATION_CHANNEL, "Background service", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel nc = new NotificationChannel(Constants.NOTIFICATION_CHANNEL, getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW);
             nc.setShowBadge(false);
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             nm.createNotificationChannel(nc);
@@ -182,10 +182,10 @@ public class SerialService extends Service implements SerialListener {
                 .setSmallIcon(R.drawable.ic_notification)
                 .setColor(getResources().getColor(R.color.colorPrimary))
                 .setContentTitle(getResources().getString(R.string.app_name))
-                .setContentText(socket != null ? "Connected to "+socket.getName() : "Background Service")
+                .setContentText(socket != null ? getString(R.string.notification_connected_to, socket.getName()) : getString(R.string.notification_background_service))
                 .setContentIntent(restartPendingIntent)
                 .setOngoing(true)
-                .addAction(new NotificationCompat.Action(R.drawable.ic_clear_white_24dp, "Disconnect", disconnectPendingIntent));
+                .addAction(new NotificationCompat.Action(R.drawable.ic_clear_white_24dp, getString(R.string.notification_disconnect), disconnectPendingIntent));
         // @drawable/ic_notification created with Android Studio -> New -> Image Asset using @color/colorPrimaryDark as background color
         // Android < API 21 does not support vectorDrawables in notifications, so both drawables used here, are created as .png instead of .xml
         Notification notification = builder.build();

@@ -3,10 +3,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/refresh"
-        android:title="Refresh Devices" />
+        android:title="@string/menu_refresh_devices" />
     <item
         android:id="@+id/baud_rate"
-        android:title="Baud rate" />
+        android:title="@string/menu_baud_rate" />
     <item
         android:id="@+id/openLatestLog"
         android:title="@string/logs_open_latest"

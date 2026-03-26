@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="newline_names">
+        <item>CR+LF</item>
+        <item>LF</item>
+        <item>&lt;なし&gt;</item>
+    </string-array>
+</resources>

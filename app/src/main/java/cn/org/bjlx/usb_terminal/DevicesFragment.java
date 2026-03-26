@@ -58,12 +58,12 @@ public class DevicesFragment extends ListFragment {
                 TextView text1 = view.findViewById(R.id.text1);
                 TextView text2 = view.findViewById(R.id.text2);
                 if(item.driver == null)
-                    text1.setText("<no driver>");
+                    text1.setText(R.string.label_no_driver);
                 else if(item.driver.getPorts().size() == 1)
                     text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver",""));
                 else
-                    text1.setText(item.driver.getClass().getSimpleName().replace("SerialDriver","")+", Port "+item.port);
-                text2.setText(String.format(Locale.US, "Vendor %04X, Product %04X", item.device.getVendorId(), item.device.getProductId()));
+                    text1.setText(getString(R.string.label_port_with_index, item.driver.getClass().getSimpleName().replace("SerialDriver",""), item.port));
+                text2.setText(getString(R.string.label_vendor_product, item.device.getVendorId(), item.device.getProductId()));
                 return view;
             }
         };
@@ -75,7 +75,7 @@ public class DevicesFragment extends ListFragment {
         setListAdapter(null);
         View header = getActivity().getLayoutInflater().inflate(R.layout.device_list_header, null, false);
         getListView().addHeaderView(header, null, false);
-        setEmptyText("<no USB devices found>");
+        setEmptyText(getString(R.string.label_no_usb_devices_found));
         ((TextView) getListView().getEmptyView()).setTextSize(18);
         setListAdapter(listAdapter);
     }
@@ -101,7 +101,7 @@ public class DevicesFragment extends ListFragment {
             final String[] baudRates = getResources().getStringArray(R.array.baud_rates);
             int pos = java.util.Arrays.asList(baudRates).indexOf(String.valueOf(baudRate));
             AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle("Baud rate");
+            builder.setTitle(R.string.dialog_baud_rate);
             builder.setSingleChoiceItems(baudRates, pos, new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int item) {
                     baudRate = Integer.parseInt(baudRates[item]);
@@ -148,7 +148,7 @@ public class DevicesFragment extends ListFragment {
     public void onListItemClick(@NonNull ListView l, @NonNull View v, int position, long id) {
         ListItem item = listItems.get(position-1);
         if(item.driver == null) {
-            Toast.makeText(getActivity(), "no driver", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), R.string.toast_no_driver, Toast.LENGTH_SHORT).show();
         } else {
             Bundle args = new Bundle();
             args.putInt("device", item.device.getDeviceId());

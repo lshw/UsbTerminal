@@ -4,20 +4,20 @@
     <item
         android:id="@+id/clear"
         android:icon="@drawable/ic_delete_white_24dp"
-        android:title="Clear"
+        android:title="@string/menu_clear"
         app:showAsAction="always" />
     <item
         android:id="@+id/newline"
-        android:title="Newline"
+        android:title="@string/menu_newline"
         app:showAsAction="never" />
     <item
         android:id="@+id/characterMode"
-        android:title="Character Mode"
+        android:title="@string/menu_character_mode"
         android:checkable="true"
         app:showAsAction="never" />
     <item
         android:id="@+id/hex"
-        android:title="HEX Mode"
+        android:title="@string/menu_hex_mode"
         android:checkable="true"
         app:showAsAction="never" />
     <item
@@ -40,21 +40,21 @@
         app:showAsAction="never" />
     <item
         android:id="@+id/controlLines"
-        android:title="Control Lines"
+        android:title="@string/menu_control_lines"
         android:checkable="true"
         app:showAsAction="never" />
     <item
         android:id="@+id/flowControl"
-        android:title="Flow Control"
+        android:title="@string/menu_flow_control"
         app:showAsAction="never" />
     <item
         android:id="@+id/backgroundNotification"
-        android:title="Notification if App in background"
+        android:title="@string/menu_background_notification"
         android:checkable="true"
         app:showAsAction="never" />
     <item
         android:id="@+id/sendBreak"
-        android:title="Send BREAK"
+        android:title="@string/menu_send_break"
         app:showAsAction="never" />
     <item
         android:id="@+id/about"

@@ -126,13 +126,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                     UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                     if (matchesDevice(device) && connected != Connected.False) {
-                        status("USB device detached");
+                        status(getString(R.string.status_usb_device_detached));
                         disconnect(true);
                     }
                 } else if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
                     UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                     if (matchesDevice(device) && reconnectPending && connected == Connected.False) {
-                        status("USB device attached, reconnecting");
+                        status(getString(R.string.status_usb_device_attached_reconnecting));
                         mainLooper.post(() -> connect(null));
                     }
                 }
@@ -354,7 +354,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             String[] newlineValues = getResources().getStringArray(R.array.newline_values);
             int pos = Arrays.asList(newlineValues).indexOf(newline);
             AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle("Newline");
+            builder.setTitle(R.string.dialog_newline);
             builder.setSingleChoiceItems(newlineNames, pos, (dialog, which) -> {
                 newline = newlineValues[which];
                 dialog.dismiss();
@@ -398,7 +398,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.backgroundNotification) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (service == null) {
-                    status("notification settings unavailable: service not connected");
+                    status(getString(R.string.status_notification_settings_unavailable));
                 } else if (!service.areNotificationsEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0);
                 } else {
@@ -409,18 +409,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.sendBreak) {
             try {
                 usbSerialPort.setBreak(true);
-                status("send BREAK");
+                status(getString(R.string.status_send_break));
                 mainLooper.postDelayed(() -> {
                     try {
                         if (usbSerialPort != null) {
                             usbSerialPort.setBreak(false);
                         }
                     } catch (Exception e) {
-                        status("clear BREAK failed: " + e.getMessage());
+                        status(getString(R.string.status_clear_break_failed, e.getMessage()));
                     }
                 }, 100);
             } catch (Exception e) {
-                status("send BREAK failed: " + e.getMessage());
+                status(getString(R.string.status_send_break_failed, e.getMessage()));
             }
             return true;
         } else if (id == R.id.about) {
@@ -458,7 +458,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         UsbManager usbManager = (UsbManager) getActivity().getSystemService(Context.USB_SERVICE);
         UsbDevice device = findDevice(usbManager);
         if(device == null) {
-            status("connection failed: device not found");
+            status(getString(R.string.status_connection_failed_device_not_found));
             return;
         }
         deviceId = device.getDeviceId();
@@ -469,11 +469,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             driver = CustomProber.getCustomProber().probeDevice(device);
         }
         if(driver == null) {
-            status("connection failed: no driver for device");
+            status(getString(R.string.status_connection_failed_no_driver));
             return;
         }
         if(driver.getPorts().size() <= portNum) {
-            status("connection failed: not enough ports at device");
+            status(getString(R.string.status_connection_failed_not_enough_ports));
             return;
         }
         usbSerialPort = driver.getPorts().get(portNum);
@@ -488,9 +488,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
         if(usbConnection == null) {
             if (!usbManager.hasPermission(driver.getDevice()))
-                status("connection failed: permission denied");
+                status(getString(R.string.status_connection_failed_permission_denied));
             else
-                status("connection failed: open failed");
+                status(getString(R.string.status_connection_failed_open_failed));
             return;
         }
 
@@ -500,7 +500,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             try {
                 usbSerialPort.setParameters(baudRate, UsbSerialPort.DATABITS_8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
             } catch (UnsupportedOperationException e) {
-                status("Setting serial parameters failed: " + e.getMessage());
+                status(getString(R.string.status_setting_serial_parameters_failed, e.getMessage()));
             }
             SerialSocket socket = new SerialSocket(getActivity().getApplicationContext(), usbConnection, usbSerialPort);
             service.connect(socket);
@@ -553,7 +553,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private void send(String str, boolean appendNewline) {
         if(connected != Connected.True) {
-            Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), R.string.toast_not_connected, Toast.LENGTH_SHORT).show();
             return;
         }
         if (hexEnabled) {
@@ -921,10 +921,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (sendText == null || sendBtn == null || sendPanel == null || characterInput == null) {
             return;
         }
-        if (hexEnabled) {
-            sendText.setHint("HEX mode");
+            if (hexEnabled) {
+            sendText.setHint(R.string.hint_hex_mode);
         } else if (characterMode) {
-            characterInput.setHint("Character mode");
+            characterInput.setHint(R.string.hint_character_mode);
             characterInput.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         } else {
             sendText.setHint("");
@@ -985,14 +985,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      */
     @Override
     public void onSerialConnect() {
-        status("connected");
+        status(getString(R.string.status_connected));
         connected = Connected.True;
         controlLines.start();
     }
 
     @Override
     public void onSerialConnectError(Exception e) {
-        status("connection failed: " + e.getMessage());
+        status(getString(R.string.status_connection_failed, e.getMessage()));
         disconnect(true);
     }
 
@@ -1009,7 +1009,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialIoError(Exception e) {
-        status("connection lost: " + e.getMessage());
+        status(getString(R.string.status_connection_lost, e.getMessage()));
         disconnect(true);
     }
 
@@ -1059,30 +1059,30 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             ArrayList<String> names = new ArrayList<>();
             ArrayList<UsbSerialPort.FlowControl> values = new ArrayList<>();
             int pos = 0;
-            names.add("<none>");
+            names.add(getString(R.string.flow_control_none));
             values.add(UsbSerialPort.FlowControl.NONE);
             if (sfc.contains(UsbSerialPort.FlowControl.RTS_CTS)) {
-                names.add("RTS/CTS control lines");
+                names.add(getString(R.string.flow_control_rts_cts));
                 values.add(UsbSerialPort.FlowControl.RTS_CTS);
                 if (fc == UsbSerialPort.FlowControl.RTS_CTS) pos = names.size() -1;
             }
             if (sfc.contains(UsbSerialPort.FlowControl.DTR_DSR)) {
-                names.add("DTR/DSR control lines");
+                names.add(getString(R.string.flow_control_dtr_dsr));
                 values.add(UsbSerialPort.FlowControl.DTR_DSR);
                 if (fc == UsbSerialPort.FlowControl.DTR_DSR) pos = names.size() - 1;
             }
             if (sfc.contains(UsbSerialPort.FlowControl.XON_XOFF)) {
-                names.add("XON/XOFF characters");
+                names.add(getString(R.string.flow_control_xon_xoff));
                 values.add(UsbSerialPort.FlowControl.XON_XOFF);
                 if (fc == UsbSerialPort.FlowControl.XON_XOFF) pos = names.size() - 1;
             }
             if (sfc.contains(UsbSerialPort.FlowControl.XON_XOFF_INLINE)) {
-                names.add("XON/XOFF characters");
+                names.add(getString(R.string.flow_control_xon_xoff));
                 values.add(UsbSerialPort.FlowControl.XON_XOFF_INLINE);
                 if (fc == UsbSerialPort.FlowControl.XON_XOFF_INLINE) pos = names.size() - 1;
             }
             AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle("Flow Control");
+            builder.setTitle(R.string.dialog_flow_control);
             builder.setSingleChoiceItems(names.toArray(new CharSequence[0]), pos, (dialog, which) -> {
                 dialog.dismiss();
                 try {
@@ -1091,17 +1091,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     flowControlFilter = usbSerialPort.getFlowControl() == UsbSerialPort.FlowControl.XON_XOFF_INLINE ? new XonXoffFilter() : null;
                     start();
                 } catch (Exception e) {
-                    status("Set flow control failed: "+e.getClass().getName()+" "+e.getMessage());
+                    status(getString(R.string.status_set_flow_control_failed, e.getClass().getName(), e.getMessage()));
                     flowControl = UsbSerialPort.FlowControl.NONE;
                     flowControlFilter = null;
                     start();
                 }
             });
-            builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
-            builder.setNeutralButton("Info", (dialog, which) -> {
+            builder.setNegativeButton(R.string.dialog_cancel, (dialog, which) -> dialog.dismiss());
+            builder.setNeutralButton(R.string.dialog_info, (dialog, which) -> {
                 dialog.dismiss();
                 AlertDialog.Builder builder2 = new AlertDialog.Builder(getActivity());
-                builder2.setTitle("Flow Control").setMessage("If send is stopped by the external device, the 'Send' button changes to 'Blocked' icon.");
+                builder2.setTitle(R.string.dialog_flow_control).setMessage(R.string.dialog_flow_control_info_message);
                 builder2.create().show();
             });
             builder.create().show();
@@ -1125,7 +1125,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     riBtn.setVisibility(lines.contains(UsbSerialPort.ControlLine.RI)   ? View.VISIBLE : View.INVISIBLE);
                 } catch (IOException e) {
                     showControlLines = false;
-                    status("getSupportedControlLines() failed: " + e.getMessage());
+                    status(getString(R.string.status_get_supported_control_lines_failed, e.getMessage()));
                 }
             }
             frame.setVisibility(showControlLines ? View.VISIBLE : View.GONE);
@@ -1177,7 +1177,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
                 mainLooper.postDelayed(runnable, refreshInterval);
             } catch (IOException e) {
-                status("getControlLines() failed: " + e.getMessage() + " -> stopped control line refresh");
+                status(getString(R.string.status_get_control_lines_failed, e.getMessage()));
             }
         }
 
@@ -1185,7 +1185,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             ToggleButton btn = (ToggleButton) v;
             if (connected != Connected.True) {
                 btn.setChecked(!btn.isChecked());
-                Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getActivity(), R.string.toast_not_connected, Toast.LENGTH_SHORT).show();
                 return;
             }
             String ctrl = "";
@@ -1193,7 +1193,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 if (btn.equals(rtsBtn)) { ctrl = "RTS"; usbSerialPort.setRTS(btn.isChecked()); }
                 if (btn.equals(dtrBtn)) { ctrl = "DTR"; usbSerialPort.setDTR(btn.isChecked()); }
             } catch (IOException e) {
-                status("set" + ctrl + " failed: " + e.getMessage());
+                status(getString(R.string.status_set_control_line_failed, ctrl, e.getMessage()));
             }
         }
 
