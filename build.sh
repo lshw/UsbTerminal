@@ -7,6 +7,34 @@ RELEASE_DIR="$SCRIPT_DIR/app/build/outputs/apk/release"
 SIGNED_APK="$RELEASE_DIR/app-release.apk"
 UNSIGNED_APK="$RELEASE_DIR/app-release-unsigned.apk"
 FINAL_APK="$SCRIPT_DIR/app-release-signed.apk"
+LOCAL_PROPERTIES="$SCRIPT_DIR/local.properties"
+
+find_apksigner() {
+  if [ -n "${APKSIGNER:-}" ] && [ -x "${APKSIGNER}" ]; then
+    printf '%s\n' "$APKSIGNER"
+    return 0
+  fi
+
+  if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+    sdk_root="$ANDROID_SDK_ROOT"
+  elif [ -n "${ANDROID_HOME:-}" ]; then
+    sdk_root="$ANDROID_HOME"
+  elif [ -f "$LOCAL_PROPERTIES" ]; then
+    sdk_root="$(sed -n 's/^sdk.dir=//p' "$LOCAL_PROPERTIES" | tail -n 1)"
+  else
+    sdk_root=""
+  fi
+
+  if [ -n "${sdk_root}" ] && [ -d "${sdk_root}/build-tools" ]; then
+    apksigner_path="$(find "${sdk_root}/build-tools" -maxdepth 2 -name apksigner | sort | tail -n 1)"
+    if [ -n "${apksigner_path}" ] && [ -x "${apksigner_path}" ]; then
+      printf '%s\n' "$apksigner_path"
+      return 0
+    fi
+  fi
+
+  return 1
+}
 
 if [ -z "${JAVA_HOME:-}" ] && [ -x /opt/android-studio/jbr/bin/javac ]; then
   export JAVA_HOME=/opt/android-studio/jbr
@@ -17,7 +45,7 @@ if [ -z "${GRADLE_USER_HOME:-}" ]; then
   export GRADLE_USER_HOME="$SCRIPT_DIR/.gradle"
 fi
 
-./gradlew build
+./gradlew assembleRelease
 
 if [ ! -f "$SIGNING_PROPS" ]; then
   if [ -f "$UNSIGNED_APK" ]; then
@@ -50,7 +78,14 @@ if [ ! -f "$UNSIGNED_APK" ]; then
   exit 1
 fi
 
-/opt/android-sdk/build-tools/36.0.0/apksigner sign \
+apksigner_bin="$(find_apksigner || true)"
+if [ -z "$apksigner_bin" ]; then
+  echo "release APK is unsigned at app/build/outputs/apk/release/app-release-unsigned.apk"
+  echo "apksigner not found; set APKSIGNER or ANDROID_SDK_ROOT to sign automatically"
+  exit 0
+fi
+
+"$apksigner_bin" sign \
   --ks "$store_file" \
   --ks-key-alias "$key_alias" \
   --ks-pass "pass:$store_password" \
