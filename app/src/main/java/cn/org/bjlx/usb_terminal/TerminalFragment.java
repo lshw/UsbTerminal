@@ -1,4 +1,4 @@
-package de.kai_morich.simple_usb_terminal;
+package cn.org.bjlx.usb_terminal;
 
 import android.Manifest;
 import android.app.Activity;

@@ -45,7 +45,7 @@ android {
             }
         }
     }
-    namespace 'de.kai_morich.simple_usb_terminal'
+    namespace 'cn.org.bjlx.usb_terminal'
 }
 
 dependencies {
