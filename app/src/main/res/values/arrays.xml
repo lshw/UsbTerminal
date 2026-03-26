@@ -37,4 +37,40 @@
         <item>@string/language_english</item>
         <item>@string/language_japanese</item>
     </string-array>
+    <string-array name="data_bits_values">
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
+    <string-array name="data_bits_labels">
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
+    <string-array name="parity_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+    <string-array name="parity_labels">
+        <item>None (N)</item>
+        <item>Odd (O)</item>
+        <item>Even (E)</item>
+        <item>Mark (M)</item>
+        <item>Space (S)</item>
+    </string-array>
+    <string-array name="stop_bits_values">
+        <item>1</item>
+        <item>3</item>
+        <item>2</item>
+    </string-array>
+    <string-array name="stop_bits_labels">
+        <item>1</item>
+        <item>1.5</item>
+        <item>2</item>
+    </string-array>
 </resources>

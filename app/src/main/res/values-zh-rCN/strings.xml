@@ -29,7 +29,7 @@
     <string name="logs_create_failed">无法创建日志目录</string>
     <string name="logs_open_unsupported">当前系统暂不支持直接打开日志目录</string>
     <string name="menu_refresh_devices">刷新设备</string>
-    <string name="menu_baud_rate">波特率</string>
+    <string name="menu_baud_rate">通讯参数设置</string>
     <string name="menu_clear">清空</string>
     <string name="menu_newline">换行</string>
     <string name="menu_character_mode">字符模式</string>
@@ -66,7 +66,11 @@
     <string name="toast_not_connected">未连接</string>
     <string name="toast_no_driver">无驱动</string>
     <string name="dialog_newline">换行</string>
-    <string name="dialog_baud_rate">波特率</string>
+    <string name="dialog_baud_rate">通讯参数设置</string>
+    <string name="comm_param_baud_rate">波特率</string>
+    <string name="comm_param_data_bits">数据位</string>
+    <string name="comm_param_parity">校验位</string>
+    <string name="comm_param_stop_bits">停止位</string>
     <string name="dialog_flow_control">流控</string>
     <string name="dialog_language">语言</string>
     <string name="dialog_cancel">取消</string>

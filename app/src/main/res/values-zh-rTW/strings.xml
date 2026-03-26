@@ -29,7 +29,7 @@
     <string name="logs_create_failed">無法建立日誌目錄</string>
     <string name="logs_open_unsupported">目前系統不支援直接開啟日誌目錄</string>
     <string name="menu_refresh_devices">重新整理裝置</string>
-    <string name="menu_baud_rate">鮑率</string>
+    <string name="menu_baud_rate">通訊參數設定</string>
     <string name="menu_clear">清除</string>
     <string name="menu_newline">換行</string>
     <string name="menu_character_mode">字元模式</string>
@@ -66,7 +66,11 @@
     <string name="toast_not_connected">尚未連線</string>
     <string name="toast_no_driver">無驅動</string>
     <string name="dialog_newline">換行</string>
-    <string name="dialog_baud_rate">鮑率</string>
+    <string name="dialog_baud_rate">通訊參數設定</string>
+    <string name="comm_param_baud_rate">鮑率</string>
+    <string name="comm_param_data_bits">資料位</string>
+    <string name="comm_param_parity">校驗位</string>
+    <string name="comm_param_stop_bits">停止位</string>
     <string name="dialog_flow_control">流控</string>
     <string name="dialog_language">語言</string>
     <string name="dialog_cancel">取消</string>

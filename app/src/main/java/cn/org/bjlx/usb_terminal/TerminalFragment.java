@@ -79,7 +79,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private final Handler mainLooper;
     private final BroadcastReceiver broadcastReceiver;
-    private int deviceId, vendorId, productId, portNum, baudRate;
+    private int deviceId, vendorId, productId, portNum, baudRate, dataBits, parity, stopBits;
     private UsbSerialPort usbSerialPort;
     private SerialService service;
 
@@ -153,6 +153,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         productId = getArguments().getInt("product", -1);
         portNum = getArguments().getInt("port");
         baudRate = getArguments().getInt("baud");
+        dataBits = getArguments().getInt("dataBits", UsbSerialPort.DATABITS_8);
+        parity = getArguments().getInt("parity", UsbSerialPort.PARITY_NONE);
+        stopBits = getArguments().getInt("stopBits", UsbSerialPort.STOPBITS_1);
         SharedPreferences preferences = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         commLogEnabled = preferences.getBoolean(PREF_COMM_LOG_ENABLED, false);
         commLogHex = preferences.getBoolean(PREF_COMM_LOG_HEX, false);
@@ -501,7 +504,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         try {
             usbSerialPort.open(usbConnection);
             try {
-                usbSerialPort.setParameters(baudRate, UsbSerialPort.DATABITS_8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
+                usbSerialPort.setParameters(baudRate, dataBits, stopBits, parity);
             } catch (UnsupportedOperationException e) {
                 status(getString(R.string.status_setting_serial_parameters_failed, e.getMessage()));
             }

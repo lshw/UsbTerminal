@@ -29,7 +29,7 @@
     <string name="logs_create_failed">ログフォルダーを作成できません</string>
     <string name="logs_open_unsupported">このシステムではログフォルダーを直接開けません</string>
     <string name="menu_refresh_devices">デバイスを更新</string>
-    <string name="menu_baud_rate">ボーレート</string>
+    <string name="menu_baud_rate">通信パラメーター設定</string>
     <string name="menu_clear">クリア</string>
     <string name="menu_newline">改行</string>
     <string name="menu_character_mode">文字モード</string>
@@ -66,7 +66,11 @@
     <string name="toast_not_connected">未接続です</string>
     <string name="toast_no_driver">ドライバーがありません</string>
     <string name="dialog_newline">改行</string>
-    <string name="dialog_baud_rate">ボーレート</string>
+    <string name="dialog_baud_rate">通信パラメーター設定</string>
+    <string name="comm_param_baud_rate">ボーレート</string>
+    <string name="comm_param_data_bits">データビット</string>
+    <string name="comm_param_parity">パリティ</string>
+    <string name="comm_param_stop_bits">ストップビット</string>
     <string name="dialog_flow_control">フロー制御</string>
     <string name="dialog_language">言語</string>
     <string name="dialog_cancel">キャンセル</string>

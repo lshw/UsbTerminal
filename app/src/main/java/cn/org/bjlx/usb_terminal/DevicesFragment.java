@@ -10,13 +10,16 @@ import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.ListFragment;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -43,6 +46,9 @@ public class DevicesFragment extends ListFragment {
     private final ArrayList<ListItem> listItems = new ArrayList<>();
     private ArrayAdapter<ListItem> listAdapter;
     private int baudRate = 38400;
+    private int dataBits = 8;
+    private int parity = 0;
+    private int stopBits = 1;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -98,17 +104,7 @@ public class DevicesFragment extends ListFragment {
             refresh();
             return true;
         } else if (id ==R.id.baud_rate) {
-            final String[] baudRates = getResources().getStringArray(R.array.baud_rates);
-            int pos = java.util.Arrays.asList(baudRates).indexOf(String.valueOf(baudRate));
-            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle(R.string.dialog_baud_rate);
-            builder.setSingleChoiceItems(baudRates, pos, new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int item) {
-                    baudRate = Integer.parseInt(baudRates[item]);
-                    dialog.dismiss();
-                }
-            });
-            builder.create().show();
+            showCommunicationSettingsDialog();
             return true;
         } else if (id == R.id.openLatestLog) {
             ((MainActivity) requireActivity()).openLatestLog();
@@ -125,6 +121,45 @@ public class DevicesFragment extends ListFragment {
         } else {
             return super.onOptionsItemSelected(item);
         }
+    }
+
+    private void showCommunicationSettingsDialog() {
+        LayoutInflater inflater = requireActivity().getLayoutInflater();
+        View dialogView = inflater.inflate(R.layout.dialog_comm_params, null, false);
+        Spinner baudRateSpinner = dialogView.findViewById(R.id.baudRateSpinner);
+        Spinner dataBitsSpinner = dialogView.findViewById(R.id.dataBitsSpinner);
+        Spinner paritySpinner = dialogView.findViewById(R.id.paritySpinner);
+        Spinner stopBitsSpinner = dialogView.findViewById(R.id.stopBitsSpinner);
+
+        String[] baudRates = getResources().getStringArray(R.array.baud_rates);
+        String[] dataBitsLabels = getResources().getStringArray(R.array.data_bits_labels);
+        String[] dataBitsValues = getResources().getStringArray(R.array.data_bits_values);
+        String[] parityLabels = getResources().getStringArray(R.array.parity_labels);
+        String[] parityValues = getResources().getStringArray(R.array.parity_values);
+        String[] stopBitsLabels = getResources().getStringArray(R.array.stop_bits_labels);
+        String[] stopBitsValues = getResources().getStringArray(R.array.stop_bits_values);
+
+        baudRateSpinner.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, baudRates));
+        dataBitsSpinner.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, dataBitsLabels));
+        paritySpinner.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, parityLabels));
+        stopBitsSpinner.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, stopBitsLabels));
+
+        baudRateSpinner.setSelection(java.util.Arrays.asList(baudRates).indexOf(String.valueOf(baudRate)));
+        dataBitsSpinner.setSelection(java.util.Arrays.asList(dataBitsValues).indexOf(String.valueOf(dataBits)));
+        paritySpinner.setSelection(java.util.Arrays.asList(parityValues).indexOf(String.valueOf(parity)));
+        stopBitsSpinner.setSelection(java.util.Arrays.asList(stopBitsValues).indexOf(String.valueOf(stopBits)));
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.dialog_baud_rate)
+                .setView(dialogView)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    baudRate = Integer.parseInt(baudRates[baudRateSpinner.getSelectedItemPosition()]);
+                    dataBits = Integer.parseInt(dataBitsValues[dataBitsSpinner.getSelectedItemPosition()]);
+                    parity = Integer.parseInt(parityValues[paritySpinner.getSelectedItemPosition()]);
+                    stopBits = Integer.parseInt(stopBitsValues[stopBitsSpinner.getSelectedItemPosition()]);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     void refresh() {
@@ -159,6 +194,9 @@ public class DevicesFragment extends ListFragment {
             args.putInt("product", item.device.getProductId());
             args.putInt("port", item.port);
             args.putInt("baud", baudRate);
+            args.putInt("dataBits", dataBits);
+            args.putInt("parity", parity);
+            args.putInt("stopBits", stopBits);
             Fragment fragment = new TerminalFragment();
             fragment.setArguments(args);
             getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment, "terminal").addToBackStack(null).commit();

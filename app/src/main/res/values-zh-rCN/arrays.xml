@@ -12,4 +12,22 @@
         <item>@string/language_english</item>
         <item>@string/language_japanese</item>
     </string-array>
+    <string-array name="data_bits_labels">
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
+    <string-array name="parity_labels">
+        <item>无校验 (N)</item>
+        <item>奇校验 (O)</item>
+        <item>偶校验 (E)</item>
+        <item>标记校验 (M)</item>
+        <item>空格校验 (S)</item>
+    </string-array>
+    <string-array name="stop_bits_labels">
+        <item>1</item>
+        <item>1.5</item>
+        <item>2</item>
+    </string-array>
 </resources>

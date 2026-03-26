@@ -29,7 +29,7 @@
     <string name="logs_create_failed">Unable to create log directory</string>
     <string name="logs_open_unsupported">This system does not support opening the log directory directly</string>
     <string name="menu_refresh_devices">Refresh Devices</string>
-    <string name="menu_baud_rate">Baud rate</string>
+    <string name="menu_baud_rate">Communication settings</string>
     <string name="menu_clear">Clear</string>
     <string name="menu_newline">Newline</string>
     <string name="menu_character_mode">Character Mode</string>
@@ -66,7 +66,11 @@
     <string name="toast_not_connected">Not connected</string>
     <string name="toast_no_driver">No driver</string>
     <string name="dialog_newline">Newline</string>
-    <string name="dialog_baud_rate">Baud rate</string>
+    <string name="dialog_baud_rate">Communication settings</string>
+    <string name="comm_param_baud_rate">Baud rate</string>
+    <string name="comm_param_data_bits">Data bits</string>
+    <string name="comm_param_parity">Parity</string>
+    <string name="comm_param_stop_bits">Stop bits</string>
     <string name="dialog_flow_control">Flow Control</string>
     <string name="dialog_language">Language</string>
     <string name="dialog_cancel">Cancel</string>
