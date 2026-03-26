@@ -52,7 +52,7 @@ final class LogFiles {
         }
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
-        values.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+        values.put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream");
         values.put(MediaStore.MediaColumns.RELATIVE_PATH, PUBLIC_LOGS_RELATIVE_PATH);
         return context.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
     }
@@ -129,8 +129,8 @@ final class LogFiles {
 
     private static Uri getLatestPublicLogUri(Context context) {
         String[] projection = {MediaColumns._ID};
-        String selection = MediaColumns.RELATIVE_PATH + "=?";
-        String[] selectionArgs = {PUBLIC_LOGS_RELATIVE_PATH};
+        String selection = MediaColumns.RELATIVE_PATH + "=? AND " + MediaColumns.DISPLAY_NAME + " LIKE ?";
+        String[] selectionArgs = {PUBLIC_LOGS_RELATIVE_PATH, "%.log"};
         String sortOrder = MediaColumns.DATE_MODIFIED + " DESC, " + MediaColumns.DATE_ADDED + " DESC";
         try (Cursor cursor = context.getContentResolver().query(
                 MediaStore.Downloads.EXTERNAL_CONTENT_URI,
