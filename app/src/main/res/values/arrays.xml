@@ -23,4 +23,18 @@
         <item>\u000a</item>
         <item></item>
     </string-array>
+    <string-array name="app_language_codes">
+        <item></item>
+        <item>zh-CN</item>
+        <item>zh-TW</item>
+        <item>en</item>
+        <item>ja</item>
+    </string-array>
+    <string-array name="app_language_labels">
+        <item>@string/language_follow_system</item>
+        <item>@string/language_simplified_chinese</item>
+        <item>@string/language_traditional_chinese</item>
+        <item>@string/language_english</item>
+        <item>@string/language_japanese</item>
+    </string-array>
 </resources>

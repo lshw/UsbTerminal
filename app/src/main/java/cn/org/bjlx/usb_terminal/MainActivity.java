@@ -5,9 +5,11 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.widget.Toast;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.FragmentManager;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.os.LocaleListCompat;
 
 public class MainActivity extends AppCompatActivity implements FragmentManager.OnBackStackChangedListener {
 
@@ -57,6 +59,47 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
                 .setNeutralButton(R.string.about_product, (dialog, which) -> openUrl(R.string.about_product_url))
                 .setNegativeButton(android.R.string.ok, null)
                 .show();
+    }
+
+    void showLanguageDialog() {
+        String[] labels = getResources().getStringArray(R.array.app_language_labels);
+        String[] codes = getResources().getStringArray(R.array.app_language_codes);
+        String currentCode = getCurrentLanguageCode();
+        int checkedItem = 0;
+        for (int i = 0; i < codes.length; i++) {
+            if (codes[i].equals(currentCode)) {
+                checkedItem = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_language)
+                .setSingleChoiceItems(labels, checkedItem, (dialog, which) -> {
+                    applyLanguageCode(codes[which]);
+                    dialog.dismiss();
+                })
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
+    }
+
+    private String getCurrentLanguageCode() {
+        LocaleListCompat locales = AppCompatDelegate.getApplicationLocales();
+        if (locales.isEmpty()) {
+            return "";
+        }
+        String tag = locales.get(0) != null ? locales.get(0).toLanguageTag() : "";
+        if (tag.startsWith("zh-CN")) return "zh-CN";
+        if (tag.startsWith("zh-TW")) return "zh-TW";
+        if (tag.startsWith("ja")) return "ja";
+        if (tag.startsWith("en")) return "en";
+        return "";
+    }
+
+    private void applyLanguageCode(String code) {
+        LocaleListCompat locales = code.isEmpty()
+                ? LocaleListCompat.getEmptyLocaleList()
+                : LocaleListCompat.forLanguageTags(code);
+        AppCompatDelegate.setApplicationLocales(locales);
     }
 
     private void openUrl(int urlResId) {

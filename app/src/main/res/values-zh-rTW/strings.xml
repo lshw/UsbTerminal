@@ -38,6 +38,7 @@
     <string name="menu_flow_control">流控</string>
     <string name="menu_background_notification">應用程式在背景時顯示通知</string>
     <string name="menu_send_break">傳送 BREAK</string>
+    <string name="menu_language">語言</string>
     <string name="label_no_driver">&lt;無驅動&gt;</string>
     <string name="label_no_usb_devices_found">&lt;找不到 USB 裝置&gt;</string>
     <string name="label_port_with_index">%1$s，連接埠 %2$d</string>
@@ -67,6 +68,7 @@
     <string name="dialog_newline">換行</string>
     <string name="dialog_baud_rate">鮑率</string>
     <string name="dialog_flow_control">流控</string>
+    <string name="dialog_language">語言</string>
     <string name="dialog_cancel">取消</string>
     <string name="dialog_info">資訊</string>
     <string name="dialog_flow_control_info_message">如果外部裝置停止接收傳送資料，傳送按鈕會變成阻擋圖示。</string>
@@ -80,4 +82,9 @@
     <string name="flow_control_rts_cts">RTS/CTS 控制線</string>
     <string name="flow_control_dtr_dsr">DTR/DSR 控制線</string>
     <string name="flow_control_xon_xoff">XON/XOFF 字元</string>
+    <string name="language_follow_system">跟隨系統</string>
+    <string name="language_simplified_chinese">简体中文</string>
+    <string name="language_traditional_chinese">繁體中文</string>
+    <string name="language_english">English</string>
+    <string name="language_japanese">日本語</string>
 </resources>

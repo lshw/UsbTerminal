@@ -389,6 +389,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.shareLatestLog) {
             ((MainActivity) requireActivity()).shareLatestLog();
             return true;
+        } else if (id == R.id.language) {
+            ((MainActivity) requireActivity()).showLanguageDialog();
+            return true;
         } else if (id == R.id.controlLines) {
             item.setChecked(controlLines.showControlLines(!item.isChecked()));
             return true;

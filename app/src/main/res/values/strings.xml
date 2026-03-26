@@ -38,6 +38,7 @@
     <string name="menu_flow_control">Flow Control</string>
     <string name="menu_background_notification">Notification if app in background</string>
     <string name="menu_send_break">Send BREAK</string>
+    <string name="menu_language">Language</string>
     <string name="label_no_driver">&lt;no driver&gt;</string>
     <string name="label_no_usb_devices_found">&lt;no USB devices found&gt;</string>
     <string name="label_port_with_index">%1$s, Port %2$d</string>
@@ -67,6 +68,7 @@
     <string name="dialog_newline">Newline</string>
     <string name="dialog_baud_rate">Baud rate</string>
     <string name="dialog_flow_control">Flow Control</string>
+    <string name="dialog_language">Language</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_info">Info</string>
     <string name="dialog_flow_control_info_message">If sending is stopped by the external device, the Send button changes to the Blocked icon.</string>
@@ -80,4 +82,9 @@
     <string name="flow_control_rts_cts">RTS/CTS control lines</string>
     <string name="flow_control_dtr_dsr">DTR/DSR control lines</string>
     <string name="flow_control_xon_xoff">XON/XOFF characters</string>
+    <string name="language_follow_system">Follow system</string>
+    <string name="language_simplified_chinese">简体中文</string>
+    <string name="language_traditional_chinese">繁體中文</string>
+    <string name="language_english">English</string>
+    <string name="language_japanese">日本語</string>
 </resources>

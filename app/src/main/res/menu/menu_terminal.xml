@@ -57,6 +57,10 @@
         android:title="@string/menu_send_break"
         app:showAsAction="never" />
     <item
+        android:id="@+id/language"
+        android:title="@string/menu_language"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/about"
         android:title="@string/about"
         app:showAsAction="never" />

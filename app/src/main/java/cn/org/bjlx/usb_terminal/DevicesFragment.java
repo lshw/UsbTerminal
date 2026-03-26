@@ -116,6 +116,9 @@ public class DevicesFragment extends ListFragment {
         } else if (id == R.id.shareLatestLog) {
             ((MainActivity) requireActivity()).shareLatestLog();
             return true;
+        } else if (id == R.id.language) {
+            ((MainActivity) requireActivity()).showLanguageDialog();
+            return true;
         } else if (id == R.id.about) {
             ((MainActivity) requireActivity()).showAboutDialog();
             return true;
