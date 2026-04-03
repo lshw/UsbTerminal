@@ -903,6 +903,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 .putBoolean(PREF_COMM_LOG_HEX, enabled)
                 .apply();
         if (commLogEnabled) {
+            reopenCommunicationLog();
             status(getString(enabled ? R.string.communication_log_format_hex : R.string.communication_log_format_text));
         }
     }
@@ -929,7 +930,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 commLogLocation = commLogFile.getAbsolutePath();
                 commLogStream = new FileOutputStream(commLogFile, true);
             }
-            if (hexEnabled) {
+            if (commLogHex) {
                 commLogWriter = new BufferedWriter(new OutputStreamWriter(commLogStream, StandardCharsets.UTF_8));
                 commLogWriter.write("# SimpleUsbTerminal communication log");
                 commLogWriter.newLine();
@@ -1008,7 +1009,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             return;
         }
         try {
-            if (!hexEnabled) {
+            if (!commLogHex) {
                 if (!"RX".equals(direction) || commLogStream == null) {
                     return;
                 }
