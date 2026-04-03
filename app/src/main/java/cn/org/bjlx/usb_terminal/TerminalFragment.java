@@ -73,18 +73,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private static final String PREFS_NAME = "terminal";
     private static final String PREF_COMM_LOG_ENABLED = "comm_log_enabled";
     private static final String PREF_COMM_LOG_HEX = "comm_log_hex";
-    private static final String PREF_TURBO_RECEIVE_MODE = "turbo_receive_mode";
     private static final String PREF_XON_XOFF_ENABLED = "xon_xoff_enabled";
     private static final long HEX_TOGGLE_MIN_INTERVAL_MILLIS = 1000;
-    private static final int MAX_RECEIVE_TEXT_LENGTH = 200_000;
-    private static final int TRIM_RECEIVE_TEXT_TO = 150_000;
-    private static final int RECEIVE_RENDER_INTERVAL_MS = 8;
-    private static final int RECEIVE_RENDER_MAX_BYTES = 64 * 1024;
-    private static final int RECEIVE_IMMEDIATE_DRAIN_THRESHOLD = 128 * 1024;
-    private static final int TURBO_RECEIVE_RENDER_INTERVAL_MS = 4;
-    private static final int TURBO_RECEIVE_RENDER_MAX_BYTES = 256 * 1024;
-    private static final int TURBO_RECEIVE_IMMEDIATE_DRAIN_THRESHOLD = 512 * 1024;
-    private static final int TURBO_DISPLAY_MAX_BYTES_PER_BATCH = 8 * 1024;
+    private static final int MAX_RECEIVE_TEXT_LENGTH = 12_000;
+    private static final int TRIM_RECEIVE_TEXT_TO = 8_000;
+    private static final int MAX_RECEIVE_TEXT_LINES = 160;
+    private static final int TRIM_RECEIVE_TEXT_TO_LINES = 100;
+    private static final int RECEIVE_RENDER_INTERVAL_MS = 33;
+    private static final int RECEIVE_RENDER_MAX_BYTES = 16 * 1024;
+    private static final int RECEIVE_IMMEDIATE_DRAIN_THRESHOLD = 64 * 1024;
     private final Handler mainLooper;
     private final BroadcastReceiver broadcastReceiver;
     private int deviceId, vendorId, productId, portNum, baudRate, dataBits, parity, stopBits;
@@ -107,7 +104,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private enum SendButtonState {Idle, Busy, Disabled};
     private boolean commLogEnabled;
     private boolean commLogHex;
-    private boolean turboReceiveMode;
     private boolean xonXoffEnabled;
     private File commLogFile;
     private Uri commLogUri;
@@ -125,6 +121,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private int pendingCursorColumn = -1;
     private boolean characterKeyboardVisible;
     private final ArrayDeque<byte[]> pendingReceiveQueue = new ArrayDeque<>();
+    private int pendingReceiveBytes;
     private boolean receiveRenderScheduled;
     private final Runnable receiveRenderRunnable = this::drainReceiveQueue;
 
@@ -173,7 +170,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         SharedPreferences preferences = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         commLogEnabled = preferences.getBoolean(PREF_COMM_LOG_ENABLED, false);
         commLogHex = preferences.getBoolean(PREF_COMM_LOG_HEX, false);
-        turboReceiveMode = preferences.getBoolean(PREF_TURBO_RECEIVE_MODE, true);
         xonXoffEnabled = preferences.getBoolean(PREF_XON_XOFF_ENABLED, false);
     }
 
@@ -258,6 +254,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_terminal, container, false);
         receiveText = view.findViewById(R.id.receive_text);                          // TextView performance decreases with number of spans
+        receiveText.setText("", TextView.BufferType.EDITABLE);
         int receiveColor = getResources().getColor(R.color.colorRecieveText);
         receiveText.setTextColor(receiveColor); // set as default color to reduce number of spans
         receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
@@ -324,7 +321,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         menu.findItem(R.id.hex).setChecked(hexEnabled);
         menu.findItem(R.id.communicationLog).setChecked(commLogEnabled);
         menu.findItem(R.id.communicationLogHex).setChecked(commLogHex);
-        menu.findItem(R.id.turboReceiveMode).setChecked(turboReceiveMode);
         menu.findItem(R.id.xonXoffMode).setChecked(xonXoffEnabled);
         controlLines.onPrepareOptionsMenu(menu);
         menu.findItem(R.id.xonXoffMode).setEnabled(usbSerialPort != null);
@@ -340,7 +336,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         if (id == R.id.clear) {
-            receiveText.setText("");
+            receiveText.setText("", TextView.BufferType.EDITABLE);
             pendingNewline = false;
             pendingCursorColumn = -1;
             if (ansiRenderer != null) {
@@ -379,10 +375,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             setCommunicationLogHex(!commLogHex);
             item.setChecked(commLogHex);
             return true;
-        } else if (id == R.id.turboReceiveMode) {
-            setTurboReceiveMode(!turboReceiveMode);
-            item.setChecked(turboReceiveMode);
-            return true;
         } else if (id == R.id.xonXoffMode) {
             setXonXoffEnabled(!xonXoffEnabled, true);
             item.setChecked(xonXoffEnabled);
@@ -398,9 +390,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             return true;
         } else if (id == R.id.controlLines) {
             item.setChecked(controlLines.showControlLines(!item.isChecked()));
-            return true;
-        } else if (id == R.id.flowControl) {
-            controlLines.selectFlowControl();
             return true;
         } else if (id == R.id.backgroundNotification) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -452,14 +441,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             reopenCommunicationLog();
         }
         return true;
-    }
-
-    private void setTurboReceiveMode(boolean enabled) {
-        turboReceiveMode = enabled;
-        requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(PREF_TURBO_RECEIVE_MODE, enabled)
-                .apply();
     }
 
     private void setXonXoffEnabled(boolean enabled, boolean reportStatus) {
@@ -700,28 +681,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private void receive(ArrayDeque<byte[]> datas) {
         SpannableStringBuilder spn = new SpannableStringBuilder();
-        int turboDisplayedBytes = 0;
         for (byte[] data : datas) {
             if (flowControlFilter != null)
                 data = flowControlFilter.filter(data);
             appendCommunicationLog("RX", data);
-            byte[] displayData = data;
-            if (turboReceiveMode) {
-                int remainingDisplayBytes = TURBO_DISPLAY_MAX_BYTES_PER_BATCH - turboDisplayedBytes;
-                if (remainingDisplayBytes <= 0) {
-                    continue;
-                }
-                if (data.length > remainingDisplayBytes) {
-                    displayData = Arrays.copyOf(data, remainingDisplayBytes);
-                    turboDisplayedBytes += displayData.length;
-                } else {
-                    turboDisplayedBytes += data.length;
-                }
-            }
             if (hexEnabled) {
-                spn.append(TextUtil.toHexString(displayData)).append('\n');
+                spn.append(TextUtil.toHexString(data)).append('\n');
             } else {
-                String msg = new String(displayData, StandardCharsets.UTF_8);
+                String msg = new String(data, StandardCharsets.UTF_8);
                 if (NEWLINE.equals(TextUtil.newline_crlf) && msg.length() > 0) {
                     // don't show CR as ^M if directly before LF
                     msg = msg.replace(TextUtil.newline_crlf, TextUtil.newline_lf);
@@ -744,8 +711,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
         }
-        receiveText.append(spn);
-        trimReceiveText();
+        if (spn.length() > 0) {
+            receiveText.append(spn);
+            trimReceiveText();
+        }
     }
 
     private void appendLocalEcho(String text) {
@@ -860,22 +829,64 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void trimReceiveText() {
-        Editable editable = receiveText.getEditableText();
-        if (editable == null || editable.length() <= MAX_RECEIVE_TEXT_LENGTH) {
+        Editable editable = getReceiveEditable();
+        if (editable == null) {
             return;
         }
-        int trimTo = editable.length() - TRIM_RECEIVE_TEXT_TO;
-        int cut = 0;
-        while (cut < trimTo && editable.charAt(cut) != '\n') {
-            cut++;
+        int charCut = 0;
+        if (editable.length() > MAX_RECEIVE_TEXT_LENGTH) {
+            int trimTo = editable.length() - TRIM_RECEIVE_TEXT_TO;
+            charCut = Math.min(trimTo, editable.length());
+            while (charCut < editable.length() && editable.charAt(charCut) != '\n') {
+                charCut++;
+            }
+            if (charCut < editable.length() && editable.charAt(charCut) == '\n') {
+                charCut++;
+            }
+            if (charCut <= 0 || charCut > editable.length()) {
+                charCut = trimTo;
+            }
         }
-        if (cut < editable.length() && editable.charAt(cut) == '\n') {
-            cut++;
+        int lineCut = findTrimStartForRecentLines(editable, TRIM_RECEIVE_TEXT_TO_LINES);
+        if (editable.length() <= MAX_RECEIVE_TEXT_LENGTH && lineCut == 0) {
+            return;
         }
+        int cut = Math.max(charCut, lineCut);
+        cut = Math.min(cut, editable.length());
         if (cut <= 0) {
-            cut = trimTo;
+            return;
         }
-        editable.delete(0, Math.min(cut, editable.length()));
+        CharSequence tail = editable.subSequence(cut, editable.length());
+        receiveText.setText(tail, TextView.BufferType.EDITABLE);
+    }
+
+    @Nullable
+    private Editable getReceiveEditable() {
+        Editable editable = receiveText.getEditableText();
+        if (editable != null) {
+            return editable;
+        }
+        CharSequence text = receiveText.getText();
+        return text instanceof Editable ? (Editable) text : null;
+    }
+
+    private int findTrimStartForRecentLines(Editable editable, int keepLines) {
+        int newlineCount = 0;
+        int cut = 0;
+        for (int i = editable.length() - 1; i >= 0; i--) {
+            if (editable.charAt(i) != '\n') {
+                continue;
+            }
+            newlineCount++;
+            if (newlineCount >= keepLines) {
+                cut = i + 1;
+                break;
+            }
+        }
+        if (newlineCount < MAX_RECEIVE_TEXT_LINES) {
+            return 0;
+        }
+        return cut;
     }
 
     private void setCommunicationLogEnabled(boolean enabled) {
@@ -1154,9 +1165,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     public void onSerialRead(ArrayDeque<byte[]> datas) {
-        for (byte[] data : datas) {
-            enqueueReceivedData(data);
-        }
+        enqueueReceivedDataBatch(datas);
     }
 
     @Override
@@ -1176,6 +1185,36 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             return;
         }
         pendingReceiveQueue.add(data);
+        pendingReceiveBytes += data.length;
+        if (!receiveRenderScheduled) {
+            receiveRenderScheduled = true;
+            mainLooper.post(receiveRenderRunnable);
+        }
+    }
+
+    private void enqueueReceivedDataBatch(ArrayDeque<byte[]> datas) {
+        if (datas == null || datas.isEmpty()) {
+            return;
+        }
+        int batchBytes = 0;
+        int chunkCount = 0;
+        for (byte[] data : datas) {
+            if (data == null || data.length == 0) {
+                continue;
+            }
+            batchBytes += data.length;
+            chunkCount++;
+        }
+        if (chunkCount == 0) {
+            return;
+        }
+        for (byte[] data : datas) {
+            if (data == null || data.length == 0) {
+                continue;
+            }
+            pendingReceiveQueue.add(data);
+            pendingReceiveBytes += data.length;
+        }
         if (!receiveRenderScheduled) {
             receiveRenderScheduled = true;
             mainLooper.post(receiveRenderRunnable);
@@ -1189,36 +1228,21 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
         ArrayDeque<byte[]> batch = new ArrayDeque<>();
         int batchBytes = 0;
-        int renderMaxBytes = turboReceiveMode ? TURBO_RECEIVE_RENDER_MAX_BYTES : RECEIVE_RENDER_MAX_BYTES;
-        while (!pendingReceiveQueue.isEmpty() && batchBytes < renderMaxBytes) {
+        while (!pendingReceiveQueue.isEmpty() && batchBytes < RECEIVE_RENDER_MAX_BYTES) {
             byte[] data = pendingReceiveQueue.removeFirst();
             batch.add(data);
             batchBytes += data.length;
+            pendingReceiveBytes -= data.length;
         }
         receive(batch);
         if (!pendingReceiveQueue.isEmpty()) {
             receiveRenderScheduled = true;
-            int immediateDrainThreshold = turboReceiveMode
-                    ? TURBO_RECEIVE_IMMEDIATE_DRAIN_THRESHOLD
-                    : RECEIVE_IMMEDIATE_DRAIN_THRESHOLD;
-            if (pendingReceiveQueueByteCount(immediateDrainThreshold) >= immediateDrainThreshold) {
+            if (pendingReceiveBytes >= RECEIVE_IMMEDIATE_DRAIN_THRESHOLD) {
                 mainLooper.post(receiveRenderRunnable);
             } else {
-                mainLooper.postDelayed(receiveRenderRunnable,
-                        turboReceiveMode ? TURBO_RECEIVE_RENDER_INTERVAL_MS : RECEIVE_RENDER_INTERVAL_MS);
+                mainLooper.postDelayed(receiveRenderRunnable, RECEIVE_RENDER_INTERVAL_MS);
             }
         }
-    }
-
-    private int pendingReceiveQueueByteCount(int byteLimit) {
-        int total = 0;
-        for (byte[] data : pendingReceiveQueue) {
-            total += data.length;
-            if (total >= byteLimit) {
-                return total;
-            }
-        }
-        return total;
     }
 
     class ControlLines {
@@ -1256,7 +1280,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 EnumSet<UsbSerialPort.FlowControl> sfc = usbSerialPort.getSupportedFlowControl();
                 menu.findItem(R.id.controlLines).setEnabled(!scl.isEmpty());
                 menu.findItem(R.id.controlLines).setChecked(showControlLines);
-                menu.findItem(R.id.flowControl).setEnabled(sfc.size() > 1);
             } catch (Exception ignored) {
             }
         }

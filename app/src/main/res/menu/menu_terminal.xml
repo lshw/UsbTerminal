@@ -27,11 +27,6 @@
         android:checkable="true"
         app:showAsAction="never" />
     <item
-        android:id="@+id/turboReceiveMode"
-        android:title="@string/turbo_receive_mode"
-        android:checkable="true"
-        app:showAsAction="never" />
-    <item
         android:id="@+id/xonXoffMode"
         android:title="@string/xon_xoff_mode"
         android:checkable="true"
@@ -48,10 +43,6 @@
         android:id="@+id/controlLines"
         android:title="@string/menu_control_lines"
         android:checkable="true"
-        app:showAsAction="never" />
-    <item
-        android:id="@+id/flowControl"
-        android:title="@string/menu_flow_control"
         app:showAsAction="never" />
     <item
         android:id="@+id/backgroundNotification"

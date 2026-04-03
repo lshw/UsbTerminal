@@ -18,7 +18,6 @@
     <string name="communication_log_hex">Communication log in HEX</string>
     <string name="communication_log_format_text">Communication log format switched to text</string>
     <string name="communication_log_format_hex">Communication log format switched to HEX</string>
-    <string name="turbo_receive_mode">Turbo Receive Mode</string>
     <string name="xon_xoff_mode">XON/XOFF</string>
     <string name="hex_toggle_too_fast">HEX mode cannot be toggled faster than once per second</string>
     <string name="logs_open">Open log directory</string>
