@@ -31,7 +31,6 @@
     <string name="menu_refresh_devices">デバイスを更新</string>
     <string name="menu_baud_rate">通信パラメーター設定</string>
     <string name="menu_clear">クリア</string>
-    <string name="menu_newline">改行</string>
     <string name="menu_character_mode">文字モード</string>
     <string name="menu_hex_mode">HEXモード</string>
     <string name="menu_control_lines">制御線</string>
@@ -65,7 +64,6 @@
     <string name="status_set_control_line_failed">%1$s の設定に失敗しました: %2$s</string>
     <string name="toast_not_connected">未接続です</string>
     <string name="toast_no_driver">ドライバーがありません</string>
-    <string name="dialog_newline">改行</string>
     <string name="dialog_baud_rate">通信パラメーター設定</string>
     <string name="comm_param_baud_rate">ボーレート</string>
     <string name="comm_param_data_bits">データビット</string>

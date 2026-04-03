@@ -7,10 +7,6 @@
         android:title="@string/menu_clear"
         app:showAsAction="always" />
     <item
-        android:id="@+id/newline"
-        android:title="@string/menu_newline"
-        app:showAsAction="never" />
-    <item
         android:id="@+id/characterMode"
         android:title="@string/menu_character_mode"
         android:checkable="true"
@@ -28,6 +24,16 @@
     <item
         android:id="@+id/communicationLogHex"
         android:title="@string/communication_log_hex"
+        android:checkable="true"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/turboReceiveMode"
+        android:title="@string/turbo_receive_mode"
+        android:checkable="true"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/xonXoffMode"
+        android:title="@string/xon_xoff_mode"
         android:checkable="true"
         app:showAsAction="never" />
     <item

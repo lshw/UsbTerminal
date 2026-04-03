@@ -121,15 +121,20 @@
             app:srcCompat="@drawable/ic_send_white_24dp" />
     </LinearLayout>
 
-    <EditText
+    <cn.org.bjlx.usb_terminal.CharacterModeEditText
         android:id="@+id/character_input"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:alpha="0"
+        android:background="@android:color/transparent"
+        android:cursorVisible="false"
         android:visibility="gone"
         android:hint="Character mode"
         android:importantForAutofill="no"
         android:imeOptions="flagNoExtractUi"
-        android:inputType="text|textCapSentences|textMultiLine|textNoSuggestions" />
+        android:inputType="text|textCapSentences|textMultiLine|textNoSuggestions"
+        android:textColor="@android:color/transparent"
+        android:textColorHint="@android:color/transparent" />
 
 </LinearLayout>
 

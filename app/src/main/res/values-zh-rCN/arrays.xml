@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string-array name="newline_names">
-        <item>CR+LF</item>
-        <item>LF</item>
-        <item>&lt;无&gt;</item>
-    </string-array>
     <string-array name="app_language_labels">
         <item>@string/language_follow_system</item>
         <item>@string/language_simplified_chinese</item>

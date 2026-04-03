@@ -21,11 +21,10 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.text.Selection;
 import android.text.Editable;
+import android.text.Selection;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
-import android.text.TextWatcher;
 import android.text.method.ScrollingMovementMethod;
 import android.text.style.ForegroundColorSpan;
 import android.view.LayoutInflater;
@@ -34,7 +33,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageButton;
@@ -75,8 +73,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private static final String PREFS_NAME = "terminal";
     private static final String PREF_COMM_LOG_ENABLED = "comm_log_enabled";
     private static final String PREF_COMM_LOG_HEX = "comm_log_hex";
+    private static final String PREF_TURBO_RECEIVE_MODE = "turbo_receive_mode";
+    private static final String PREF_XON_XOFF_ENABLED = "xon_xoff_enabled";
     private static final long HEX_TOGGLE_MIN_INTERVAL_MILLIS = 1000;
-
+    private static final int MAX_RECEIVE_TEXT_LENGTH = 200_000;
+    private static final int TRIM_RECEIVE_TEXT_TO = 150_000;
+    private static final int RECEIVE_RENDER_INTERVAL_MS = 8;
+    private static final int RECEIVE_RENDER_MAX_BYTES = 64 * 1024;
+    private static final int RECEIVE_IMMEDIATE_DRAIN_THRESHOLD = 128 * 1024;
+    private static final int TURBO_RECEIVE_RENDER_INTERVAL_MS = 4;
+    private static final int TURBO_RECEIVE_RENDER_MAX_BYTES = 256 * 1024;
+    private static final int TURBO_RECEIVE_IMMEDIATE_DRAIN_THRESHOLD = 512 * 1024;
+    private static final int TURBO_DISPLAY_MAX_BYTES_PER_BATCH = 8 * 1024;
     private final Handler mainLooper;
     private final BroadcastReceiver broadcastReceiver;
     private int deviceId, vendorId, productId, portNum, baudRate, dataBits, parity, stopBits;
@@ -85,11 +93,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private TextView receiveText;
     private TextView sendText;
-    private EditText characterInput;
+    private CharacterModeEditText characterInput;
     private ImageButton sendBtn;
     private View sendPanel;
     private TextUtil.HexWatcher hexWatcher;
-    private TextWatcher characterModeWatcher;
 
     private Connected connected = Connected.False;
     private boolean initialStart = true;
@@ -99,6 +106,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private enum SendButtonState {Idle, Busy, Disabled};
     private boolean commLogEnabled;
     private boolean commLogHex;
+    private boolean turboReceiveMode;
+    private boolean xonXoffEnabled;
     private File commLogFile;
     private Uri commLogUri;
     private String commLogLocation;
@@ -110,9 +119,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private XonXoffFilter flowControlFilter;
 
     private boolean pendingNewline = false;
-    private String newline = TextUtil.newline_crlf;
+    private static final String NEWLINE = TextUtil.newline_crlf;
     private TextUtil.AnsiRenderer ansiRenderer;
     private int pendingCursorColumn = -1;
+    private boolean characterKeyboardVisible;
+    private final ArrayDeque<byte[]> pendingReceiveQueue = new ArrayDeque<>();
+    private boolean receiveRenderScheduled;
+    private final Runnable receiveRenderRunnable = this::drainReceiveQueue;
 
     public TerminalFragment() {
         mainLooper = new Handler(Looper.getMainLooper());
@@ -159,6 +172,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         SharedPreferences preferences = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         commLogEnabled = preferences.getBoolean(PREF_COMM_LOG_ENABLED, false);
         commLogHex = preferences.getBoolean(PREF_COMM_LOG_HEX, false);
+        turboReceiveMode = preferences.getBoolean(PREF_TURBO_RECEIVE_MODE, true);
+        xonXoffEnabled = preferences.getBoolean(PREF_XON_XOFF_ENABLED, false);
     }
 
     @Override
@@ -246,6 +261,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         receiveText.setTextColor(receiveColor); // set as default color to reduce number of spans
         receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
         receiveText.setHorizontallyScrolling(false);
+        View terminalRoot = view.findViewById(R.id.terminal_root);
         ansiRenderer = new TextUtil.AnsiRenderer(receiveColor, new TextUtil.AnsiRenderer.ControlHandler() {
             @Override
             public void onEraseInLine(int mode) {
@@ -265,45 +281,30 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         hexWatcher = new TextUtil.HexWatcher(sendText);
         hexWatcher.enable(hexEnabled);
         sendText.addTextChangedListener(hexWatcher);
-        characterModeWatcher = new TextWatcher() {
-            private boolean selfChange;
-
+        characterInput.setListener(new CharacterModeEditText.Listener() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            public void onTextCommitted(String text) {
+                if (!characterMode || hexEnabled || connected != Connected.True) {
+                    return;
+                }
+                send(text, false);
             }
 
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            public void onBackspace() {
+                if (!characterMode || hexEnabled || connected != Connected.True) {
+                    return;
+                }
+                send("\b", false);
             }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (selfChange || !characterMode || s.length() == 0) {
-                    return;
-                }
-                if (BaseInputConnection.getComposingSpanStart(s) != -1 || BaseInputConnection.getComposingSpanEnd(s) != -1) {
-                    return;
-                }
-                if (!hexEnabled && connected == Connected.True) {
-                    send(s.toString(), false);
-                }
-                selfChange = true;
-                s.clear();
-                selfChange = false;
+        });
+        View.OnClickListener keyboardToggleListener = v -> {
+            if (characterMode && !hexEnabled) {
+                toggleCharacterKeyboard();
             }
         };
-        characterInput.addTextChangedListener(characterModeWatcher);
-        characterInput.setOnEditorActionListener((TextView v, int actionId, android.view.KeyEvent event) -> {
-            if (!characterMode || hexEnabled || characterInput.getText().length() == 0) {
-                return false;
-            }
-            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_SEND) {
-                send(characterInput.getText().toString(), false);
-                characterInput.getText().clear();
-                return true;
-            }
-            return false;
-        });
+        terminalRoot.setOnClickListener(keyboardToggleListener);
+        receiveText.setOnClickListener(keyboardToggleListener);
         updateInputModeUi();
 
         View sendBtn = view.findViewById(R.id.send_btn);
@@ -322,7 +323,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         menu.findItem(R.id.hex).setChecked(hexEnabled);
         menu.findItem(R.id.communicationLog).setChecked(commLogEnabled);
         menu.findItem(R.id.communicationLogHex).setChecked(commLogHex);
+        menu.findItem(R.id.turboReceiveMode).setChecked(turboReceiveMode);
+        menu.findItem(R.id.xonXoffMode).setChecked(xonXoffEnabled);
         controlLines.onPrepareOptionsMenu(menu);
+        menu.findItem(R.id.xonXoffMode).setEnabled(usbSerialPort != null);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             menu.findItem(R.id.backgroundNotification).setChecked(service != null && service.areNotificationsEnabled());
         } else {
@@ -352,18 +356,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             item.setChecked(characterMode);
             updateInputModeUi();
             return true;
-        } else if (id == R.id.newline) {
-            String[] newlineNames = getResources().getStringArray(R.array.newline_names);
-            String[] newlineValues = getResources().getStringArray(R.array.newline_values);
-            int pos = Arrays.asList(newlineValues).indexOf(newline);
-            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle(R.string.dialog_newline);
-            builder.setSingleChoiceItems(newlineNames, pos, (dialog, which) -> {
-                newline = newlineValues[which];
-                dialog.dismiss();
-            });
-            builder.create().show();
-            return true;
         } else if (id == R.id.hex) {
             if (!applyHexMode(!hexEnabled, true)) {
                 item.setChecked(hexEnabled);
@@ -385,6 +377,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.communicationLogHex) {
             setCommunicationLogHex(!commLogHex);
             item.setChecked(commLogHex);
+            return true;
+        } else if (id == R.id.turboReceiveMode) {
+            setTurboReceiveMode(!turboReceiveMode);
+            item.setChecked(turboReceiveMode);
+            return true;
+        } else if (id == R.id.xonXoffMode) {
+            setXonXoffEnabled(!xonXoffEnabled, true);
+            item.setChecked(xonXoffEnabled);
             return true;
         } else if (id == R.id.openLatestLog) {
             ((MainActivity) requireActivity()).openLatestLog();
@@ -451,6 +451,86 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             reopenCommunicationLog();
         }
         return true;
+    }
+
+    private void setTurboReceiveMode(boolean enabled) {
+        turboReceiveMode = enabled;
+        requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(PREF_TURBO_RECEIVE_MODE, enabled)
+                .apply();
+    }
+
+    private void setXonXoffEnabled(boolean enabled, boolean reportStatus) {
+        xonXoffEnabled = enabled;
+        requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(PREF_XON_XOFF_ENABLED, enabled)
+                .apply();
+        applyPreferredFlowControl(reportStatus);
+    }
+
+    private void applyPreferredFlowControl(boolean reportStatus) {
+        if (usbSerialPort == null) {
+            return;
+        }
+        try {
+            EnumSet<UsbSerialPort.FlowControl> supported = usbSerialPort.getSupportedFlowControl();
+            UsbSerialPort.FlowControl target = UsbSerialPort.FlowControl.NONE;
+            if (xonXoffEnabled) {
+                if (supported.contains(UsbSerialPort.FlowControl.XON_XOFF_INLINE)) {
+                    target = UsbSerialPort.FlowControl.XON_XOFF_INLINE;
+                } else if (supported.contains(UsbSerialPort.FlowControl.XON_XOFF)) {
+                    target = UsbSerialPort.FlowControl.XON_XOFF;
+                } else {
+                    // Some drivers do not advertise XON/XOFF support although the device
+                    // sends inline XON/XOFF characters. Fall back to software filtering.
+                    target = UsbSerialPort.FlowControl.XON_XOFF_INLINE;
+                }
+            }
+            setFlowControlMode(target);
+            controlLines.start();
+            if (reportStatus) {
+                status(getString(target == UsbSerialPort.FlowControl.NONE
+                        ? R.string.status_xon_xoff_disabled
+                        : R.string.status_xon_xoff_enabled));
+            }
+        } catch (Exception e) {
+            flowControlFilter = null;
+            controlLines.flowControl = UsbSerialPort.FlowControl.NONE;
+            if (reportStatus) {
+                status(getString(R.string.status_set_flow_control_failed, e.getClass().getName(), e.getMessage()));
+            }
+        }
+    }
+
+    private UsbSerialPort.FlowControl getEffectiveFlowControl() {
+        if (flowControlFilter != null) {
+            return UsbSerialPort.FlowControl.XON_XOFF_INLINE;
+        }
+        if (usbSerialPort == null) {
+            return UsbSerialPort.FlowControl.NONE;
+        }
+        try {
+            return usbSerialPort.getFlowControl();
+        } catch (Exception ignored) {
+            return UsbSerialPort.FlowControl.NONE;
+        }
+    }
+
+    private void setFlowControlMode(UsbSerialPort.FlowControl target) throws IOException {
+        EnumSet<UsbSerialPort.FlowControl> supported = usbSerialPort.getSupportedFlowControl();
+        boolean softwareInlineFallback = target == UsbSerialPort.FlowControl.XON_XOFF_INLINE
+                && !supported.contains(UsbSerialPort.FlowControl.XON_XOFF_INLINE);
+        if (softwareInlineFallback) {
+            usbSerialPort.setFlowControl(UsbSerialPort.FlowControl.NONE);
+            controlLines.flowControl = UsbSerialPort.FlowControl.XON_XOFF_INLINE;
+            flowControlFilter = new XonXoffFilter();
+        } else {
+            usbSerialPort.setFlowControl(target);
+            controlLines.flowControl = target;
+            flowControlFilter = target == UsbSerialPort.FlowControl.XON_XOFF_INLINE ? new XonXoffFilter() : null;
+        }
     }
 
     /*
@@ -572,18 +652,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             StringBuilder sb = new StringBuilder();
             TextUtil.toHexString(sb, payload);
             if (appendNewline) {
-                TextUtil.toHexString(sb, newline.getBytes());
+                TextUtil.toHexString(sb, NEWLINE.getBytes());
             }
             msg = sb.toString();
             data = TextUtil.fromHexString(msg);
         } else {
             msg = str;
-            data = appendNewline ? (str + newline).getBytes(StandardCharsets.UTF_8) : str.getBytes(StandardCharsets.UTF_8);
+            data = appendNewline ? (str + NEWLINE).getBytes(StandardCharsets.UTF_8) : str.getBytes(StandardCharsets.UTF_8);
         }
         try {
-            SpannableStringBuilder spn = new SpannableStringBuilder(msg + '\n');
-            spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorSendText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            receiveText.append(spn);
+            if (!characterMode || hexEnabled) {
+                appendLocalEcho(hexEnabled ? msg + '\n' : new String(data, StandardCharsets.UTF_8));
+            }
             appendCommunicationLog("TX", data);
             service.write(data);
         } catch (SerialTimeoutException e) { // e.g. writing large data at low baud rate or suspended by flow control
@@ -618,14 +698,29 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private void receive(ArrayDeque<byte[]> datas) {
         SpannableStringBuilder spn = new SpannableStringBuilder();
+        int turboDisplayedBytes = 0;
         for (byte[] data : datas) {
             if (flowControlFilter != null)
                 data = flowControlFilter.filter(data);
+            appendCommunicationLog("RX", data);
+            byte[] displayData = data;
+            if (turboReceiveMode) {
+                int remainingDisplayBytes = TURBO_DISPLAY_MAX_BYTES_PER_BATCH - turboDisplayedBytes;
+                if (remainingDisplayBytes <= 0) {
+                    continue;
+                }
+                if (data.length > remainingDisplayBytes) {
+                    displayData = Arrays.copyOf(data, remainingDisplayBytes);
+                    turboDisplayedBytes += displayData.length;
+                } else {
+                    turboDisplayedBytes += data.length;
+                }
+            }
             if (hexEnabled) {
-                spn.append(TextUtil.toHexString(data)).append('\n');
+                spn.append(TextUtil.toHexString(displayData)).append('\n');
             } else {
-                String msg = new String(data);
-                if (newline.equals(TextUtil.newline_crlf) && msg.length() > 0) {
+                String msg = new String(displayData, StandardCharsets.UTF_8);
+                if (NEWLINE.equals(TextUtil.newline_crlf) && msg.length() > 0) {
                     // don't show CR as ^M if directly before LF
                     msg = msg.replace(TextUtil.newline_crlf, TextUtil.newline_lf);
                     // special handling if CR and LF come in separate fragments
@@ -643,12 +738,29 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 if (ansiRenderer != null) {
                     appendAnsiText(spn, msg);
                 } else {
-                    spn.append(TextUtil.toCaretString(msg, newline.length() != 0));
+                    spn.append(TextUtil.toCaretString(msg, true));
                 }
             }
-            appendCommunicationLog("RX", data);
         }
         receiveText.append(spn);
+        trimReceiveText();
+    }
+
+    private void appendLocalEcho(String text) {
+        SpannableStringBuilder spn = new SpannableStringBuilder();
+        if (hexEnabled) {
+            spn.append(text);
+        } else if (ansiRenderer != null) {
+            appendAnsiText(spn, text);
+        } else {
+            spn.append(TextUtil.toCaretString(text, true));
+        }
+        if (spn.length() > 0) {
+            spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorSendText)),
+                    0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+            receiveText.append(spn);
+            trimReceiveText();
+        }
     }
 
     private void appendAnsiText(SpannableStringBuilder target, String msg) {
@@ -668,7 +780,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
                 continue;
             }
-            ansiRenderer.appendTo(target, String.valueOf(c), newline.length() != 0);
+            ansiRenderer.appendTo(target, String.valueOf(c), true);
         }
         applyPendingCursorCommand(target, existing);
     }
@@ -679,7 +791,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
         deleteToLineStart(target, existing);
         for (int i = 0; i < pendingCursorColumn; i++) {
-            ansiRenderer.appendTo(target, " ", newline.length() != 0);
+            ansiRenderer.appendTo(target, " ", true);
         }
         pendingCursorColumn = -1;
     }
@@ -742,6 +854,26 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         SpannableStringBuilder spn = new SpannableStringBuilder(str + '\n');
         spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorStatusText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         receiveText.append(spn);
+        trimReceiveText();
+    }
+
+    private void trimReceiveText() {
+        Editable editable = receiveText.getEditableText();
+        if (editable == null || editable.length() <= MAX_RECEIVE_TEXT_LENGTH) {
+            return;
+        }
+        int trimTo = editable.length() - TRIM_RECEIVE_TEXT_TO;
+        int cut = 0;
+        while (cut < trimTo && editable.charAt(cut) != '\n') {
+            cut++;
+        }
+        if (cut < editable.length() && editable.charAt(cut) == '\n') {
+            cut++;
+        }
+        if (cut <= 0) {
+            cut = trimTo;
+        }
+        editable.delete(0, Math.min(cut, editable.length()));
     }
 
     private void setCommunicationLogEnabled(boolean enabled) {
@@ -803,7 +935,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 commLogWriter.newLine();
                 commLogWriter.write("# baudRate=" + baudRate);
                 commLogWriter.newLine();
-                commLogWriter.flush();
             }
             return true;
         } catch (IOException e) {
@@ -880,7 +1011,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     return;
                 }
                 commLogStream.write(data);
-                commLogStream.flush();
                 return;
             }
             StringBuilder line = new StringBuilder();
@@ -900,7 +1030,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             }
             commLogWriter.write(line.toString());
             commLogWriter.newLine();
-            commLogWriter.flush();
         } catch (IOException e) {
             closeCommunicationLog();
             commLogEnabled = false;
@@ -950,11 +1079,22 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
+    private void toggleCharacterKeyboard() {
+        if (characterKeyboardVisible) {
+            characterInput.clearFocus();
+            hideSoftKeyboard(characterInput);
+        } else {
+            characterInput.requestFocus();
+            showSoftKeyboard(characterInput);
+        }
+    }
+
     private void showSoftKeyboard(View view) {
         InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) {
             view.post(() -> {
                 view.requestFocus();
+                characterKeyboardVisible = true;
                 imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
             });
         }
@@ -963,6 +1103,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private void hideSoftKeyboard(View view) {
         InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) {
+            characterKeyboardVisible = false;
             imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
     }
@@ -993,6 +1134,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onSerialConnect() {
         status(getString(R.string.status_connected));
         connected = Connected.True;
+        applyPreferredFlowControl(false);
         controlLines.start();
     }
 
@@ -1004,19 +1146,69 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialRead(byte[] data) {
-        ArrayDeque<byte[]> datas = new ArrayDeque<>();
-        datas.add(data);
-        receive(datas);
+        enqueueReceivedData(data);
     }
 
     public void onSerialRead(ArrayDeque<byte[]> datas) {
-        receive(datas);
+        for (byte[] data : datas) {
+            enqueueReceivedData(data);
+        }
     }
 
     @Override
     public void onSerialIoError(Exception e) {
         status(getString(R.string.status_connection_lost, e.getMessage()));
         disconnect(true);
+    }
+
+    private void enqueueReceivedData(byte[] data) {
+        if (data == null || data.length == 0) {
+            return;
+        }
+        pendingReceiveQueue.add(data);
+        if (!receiveRenderScheduled) {
+            receiveRenderScheduled = true;
+            mainLooper.post(receiveRenderRunnable);
+        }
+    }
+
+    private void drainReceiveQueue() {
+        receiveRenderScheduled = false;
+        if (pendingReceiveQueue.isEmpty()) {
+            return;
+        }
+        ArrayDeque<byte[]> batch = new ArrayDeque<>();
+        int batchBytes = 0;
+        int renderMaxBytes = turboReceiveMode ? TURBO_RECEIVE_RENDER_MAX_BYTES : RECEIVE_RENDER_MAX_BYTES;
+        while (!pendingReceiveQueue.isEmpty() && batchBytes < renderMaxBytes) {
+            byte[] data = pendingReceiveQueue.removeFirst();
+            batch.add(data);
+            batchBytes += data.length;
+        }
+        receive(batch);
+        if (!pendingReceiveQueue.isEmpty()) {
+            receiveRenderScheduled = true;
+            int immediateDrainThreshold = turboReceiveMode
+                    ? TURBO_RECEIVE_IMMEDIATE_DRAIN_THRESHOLD
+                    : RECEIVE_IMMEDIATE_DRAIN_THRESHOLD;
+            if (pendingReceiveQueueByteCount(immediateDrainThreshold) >= immediateDrainThreshold) {
+                mainLooper.post(receiveRenderRunnable);
+            } else {
+                mainLooper.postDelayed(receiveRenderRunnable,
+                        turboReceiveMode ? TURBO_RECEIVE_RENDER_INTERVAL_MS : RECEIVE_RENDER_INTERVAL_MS);
+            }
+        }
+    }
+
+    private int pendingReceiveQueueByteCount(int byteLimit) {
+        int total = 0;
+        for (byte[] data : pendingReceiveQueue) {
+            total += data.length;
+            if (total >= byteLimit) {
+                return total;
+            }
+        }
+        return total;
     }
 
     class ControlLines {
@@ -1061,7 +1253,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
         void selectFlowControl() {
             EnumSet<UsbSerialPort.FlowControl> sfc = usbSerialPort.getSupportedFlowControl();
-            UsbSerialPort.FlowControl fc = usbSerialPort.getFlowControl();
+            UsbSerialPort.FlowControl fc = getEffectiveFlowControl();
             ArrayList<String> names = new ArrayList<>();
             ArrayList<UsbSerialPort.FlowControl> values = new ArrayList<>();
             int pos = 0;
@@ -1082,7 +1274,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 values.add(UsbSerialPort.FlowControl.XON_XOFF);
                 if (fc == UsbSerialPort.FlowControl.XON_XOFF) pos = names.size() - 1;
             }
-            if (sfc.contains(UsbSerialPort.FlowControl.XON_XOFF_INLINE)) {
+            if (sfc.contains(UsbSerialPort.FlowControl.XON_XOFF_INLINE) || !sfc.contains(UsbSerialPort.FlowControl.XON_XOFF)) {
                 names.add(getString(R.string.flow_control_xon_xoff));
                 values.add(UsbSerialPort.FlowControl.XON_XOFF_INLINE);
                 if (fc == UsbSerialPort.FlowControl.XON_XOFF_INLINE) pos = names.size() - 1;
@@ -1093,8 +1285,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 dialog.dismiss();
                 try {
                     flowControl = values.get(which);
-                    usbSerialPort.setFlowControl(flowControl);
-                    flowControlFilter = usbSerialPort.getFlowControl() == UsbSerialPort.FlowControl.XON_XOFF_INLINE ? new XonXoffFilter() : null;
+                    setFlowControlMode(flowControl);
                     start();
                 } catch (Exception e) {
                     status(getString(R.string.status_set_flow_control_failed, e.getClass().getName(), e.getMessage()));
@@ -1172,7 +1363,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     if(riBtn.isChecked()  != lines.contains(UsbSerialPort.ControlLine.RI))  riBtn.setChecked(!riBtn.isChecked());
                 }
                 if (flowControl != UsbSerialPort.FlowControl.NONE) {
-                    switch (usbSerialPort.getFlowControl()) {
+                    switch (getEffectiveFlowControl()) {
                         case DTR_DSR:         sendAllowed = usbSerialPort.getDSR(); break;
                         case RTS_CTS:         sendAllowed = usbSerialPort.getCTS(); break;
                         case XON_XOFF:        sendAllowed = usbSerialPort.getXON(); break;

@@ -31,7 +31,6 @@
     <string name="menu_refresh_devices">重新整理裝置</string>
     <string name="menu_baud_rate">通訊參數設定</string>
     <string name="menu_clear">清除</string>
-    <string name="menu_newline">換行</string>
     <string name="menu_character_mode">字元模式</string>
     <string name="menu_hex_mode">HEX 模式</string>
     <string name="menu_control_lines">控制線</string>
@@ -65,7 +64,6 @@
     <string name="status_set_control_line_failed">設定 %1$s 失敗：%2$s</string>
     <string name="toast_not_connected">尚未連線</string>
     <string name="toast_no_driver">無驅動</string>
-    <string name="dialog_newline">換行</string>
     <string name="dialog_baud_rate">通訊參數設定</string>
     <string name="comm_param_baud_rate">鮑率</string>
     <string name="comm_param_data_bits">資料位</string>

@@ -31,7 +31,6 @@
     <string name="menu_refresh_devices">刷新设备</string>
     <string name="menu_baud_rate">通讯参数设置</string>
     <string name="menu_clear">清空</string>
-    <string name="menu_newline">换行</string>
     <string name="menu_character_mode">字符模式</string>
     <string name="menu_hex_mode">HEX 模式</string>
     <string name="menu_control_lines">控制线</string>
@@ -65,7 +64,6 @@
     <string name="status_set_control_line_failed">设置 %1$s 失败：%2$s</string>
     <string name="toast_not_connected">未连接</string>
     <string name="toast_no_driver">无驱动</string>
-    <string name="dialog_newline">换行</string>
     <string name="dialog_baud_rate">通讯参数设置</string>
     <string name="comm_param_baud_rate">波特率</string>
     <string name="comm_param_data_bits">数据位</string>

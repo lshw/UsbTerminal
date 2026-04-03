@@ -18,6 +18,8 @@
     <string name="communication_log_hex">Communication log in HEX</string>
     <string name="communication_log_format_text">Communication log format switched to text</string>
     <string name="communication_log_format_hex">Communication log format switched to HEX</string>
+    <string name="turbo_receive_mode">Turbo Receive Mode</string>
+    <string name="xon_xoff_mode">XON/XOFF</string>
     <string name="hex_toggle_too_fast">HEX mode cannot be toggled faster than once per second</string>
     <string name="logs_open">Open log directory</string>
     <string name="logs_open_latest">Open latest log</string>
@@ -31,7 +33,6 @@
     <string name="menu_refresh_devices">Refresh Devices</string>
     <string name="menu_baud_rate">Communication settings</string>
     <string name="menu_clear">Clear</string>
-    <string name="menu_newline">Newline</string>
     <string name="menu_character_mode">Character Mode</string>
     <string name="menu_hex_mode">HEX Mode</string>
     <string name="menu_control_lines">Control Lines</string>
@@ -59,13 +60,15 @@
     <string name="status_connected">Connected</string>
     <string name="status_connection_failed">Connection failed: %1$s</string>
     <string name="status_connection_lost">Connection lost: %1$s</string>
+    <string name="status_xon_xoff_enabled">XON/XOFF enabled</string>
+    <string name="status_xon_xoff_disabled">XON/XOFF disabled</string>
+    <string name="status_xon_xoff_unsupported">XON/XOFF is not supported by this serial driver</string>
     <string name="status_set_flow_control_failed">Set flow control failed: %1$s %2$s</string>
     <string name="status_get_supported_control_lines_failed">getSupportedControlLines() failed: %1$s</string>
     <string name="status_get_control_lines_failed">getControlLines() failed: %1$s - stopped control line refresh</string>
     <string name="status_set_control_line_failed">set %1$s failed: %2$s</string>
     <string name="toast_not_connected">Not connected</string>
     <string name="toast_no_driver">No driver</string>
-    <string name="dialog_newline">Newline</string>
     <string name="dialog_baud_rate">Communication settings</string>
     <string name="comm_param_baud_rate">Baud rate</string>
     <string name="comm_param_data_bits">Data bits</string>
