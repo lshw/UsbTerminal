@@ -50,7 +50,6 @@ import com.hoho.android.usbserial.driver.SerialTimeoutException;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
-import com.hoho.android.usbserial.util.XonXoffFilter;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -61,7 +60,6 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.EnumSet;
@@ -73,7 +71,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private static final String PREFS_NAME = "terminal";
     private static final String PREF_COMM_LOG_ENABLED = "comm_log_enabled";
     private static final String PREF_COMM_LOG_HEX = "comm_log_hex";
-    private static final String PREF_XON_XOFF_ENABLED = "xon_xoff_enabled";
     private static final long HEX_TOGGLE_MIN_INTERVAL_MILLIS = 1000;
     private static final int MAX_RECEIVE_TEXT_LENGTH = 12_000;
     private static final int TRIM_RECEIVE_TEXT_TO = 8_000;
@@ -104,7 +101,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private enum SendButtonState {Idle, Busy, Disabled};
     private boolean commLogEnabled;
     private boolean commLogHex;
-    private boolean xonXoffEnabled;
     private File commLogFile;
     private Uri commLogUri;
     private String commLogLocation;
@@ -113,7 +109,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private long lastHexToggleAtMillis;
 
     private ControlLines controlLines = new ControlLines();
-    private XonXoffFilter flowControlFilter;
 
     private boolean pendingNewline = false;
     private static final String NEWLINE = TextUtil.newline_crlf;
@@ -170,7 +165,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         SharedPreferences preferences = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         commLogEnabled = preferences.getBoolean(PREF_COMM_LOG_ENABLED, false);
         commLogHex = preferences.getBoolean(PREF_COMM_LOG_HEX, false);
-        xonXoffEnabled = preferences.getBoolean(PREF_XON_XOFF_ENABLED, false);
     }
 
     @Override
@@ -321,9 +315,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         menu.findItem(R.id.hex).setChecked(hexEnabled);
         menu.findItem(R.id.communicationLog).setChecked(commLogEnabled);
         menu.findItem(R.id.communicationLogHex).setChecked(commLogHex);
-        menu.findItem(R.id.xonXoffMode).setChecked(xonXoffEnabled);
         controlLines.onPrepareOptionsMenu(menu);
-        menu.findItem(R.id.xonXoffMode).setEnabled(usbSerialPort != null);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             menu.findItem(R.id.backgroundNotification).setChecked(service != null && service.areNotificationsEnabled());
         } else {
@@ -374,10 +366,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.communicationLogHex) {
             setCommunicationLogHex(!commLogHex);
             item.setChecked(commLogHex);
-            return true;
-        } else if (id == R.id.xonXoffMode) {
-            setXonXoffEnabled(!xonXoffEnabled, true);
-            item.setChecked(xonXoffEnabled);
             return true;
         } else if (id == R.id.shareLatestLog) {
             ((MainActivity) requireActivity()).shareLatestLog();
@@ -440,75 +428,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         return true;
     }
 
-    private void setXonXoffEnabled(boolean enabled, boolean reportStatus) {
-        xonXoffEnabled = enabled;
-        requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(PREF_XON_XOFF_ENABLED, enabled)
-                .apply();
-        applyPreferredFlowControl(reportStatus);
-    }
-
-    private void applyPreferredFlowControl(boolean reportStatus) {
+    private void applyNoFlowControl() {
         if (usbSerialPort == null) {
             return;
         }
         try {
-            EnumSet<UsbSerialPort.FlowControl> supported = usbSerialPort.getSupportedFlowControl();
-            UsbSerialPort.FlowControl target = UsbSerialPort.FlowControl.NONE;
-            if (xonXoffEnabled) {
-                if (supported.contains(UsbSerialPort.FlowControl.XON_XOFF_INLINE)) {
-                    target = UsbSerialPort.FlowControl.XON_XOFF_INLINE;
-                } else if (supported.contains(UsbSerialPort.FlowControl.XON_XOFF)) {
-                    target = UsbSerialPort.FlowControl.XON_XOFF;
-                } else {
-                    // Some drivers do not advertise XON/XOFF support although the device
-                    // sends inline XON/XOFF characters. Fall back to software filtering.
-                    target = UsbSerialPort.FlowControl.XON_XOFF_INLINE;
-                }
-            }
-            setFlowControlMode(target);
-            controlLines.start();
-            if (reportStatus) {
-                status(getString(target == UsbSerialPort.FlowControl.NONE
-                        ? R.string.status_xon_xoff_disabled
-                        : R.string.status_xon_xoff_enabled));
-            }
-        } catch (Exception e) {
-            flowControlFilter = null;
-            controlLines.flowControl = UsbSerialPort.FlowControl.NONE;
-            if (reportStatus) {
-                status(getString(R.string.status_set_flow_control_failed, e.getClass().getName(), e.getMessage()));
-            }
-        }
-    }
-
-    private UsbSerialPort.FlowControl getEffectiveFlowControl() {
-        if (flowControlFilter != null) {
-            return UsbSerialPort.FlowControl.XON_XOFF_INLINE;
-        }
-        if (usbSerialPort == null) {
-            return UsbSerialPort.FlowControl.NONE;
-        }
-        try {
-            return usbSerialPort.getFlowControl();
-        } catch (Exception ignored) {
-            return UsbSerialPort.FlowControl.NONE;
-        }
-    }
-
-    private void setFlowControlMode(UsbSerialPort.FlowControl target) throws IOException {
-        EnumSet<UsbSerialPort.FlowControl> supported = usbSerialPort.getSupportedFlowControl();
-        boolean softwareInlineFallback = target == UsbSerialPort.FlowControl.XON_XOFF_INLINE
-                && !supported.contains(UsbSerialPort.FlowControl.XON_XOFF_INLINE);
-        if (softwareInlineFallback) {
             usbSerialPort.setFlowControl(UsbSerialPort.FlowControl.NONE);
-            controlLines.flowControl = UsbSerialPort.FlowControl.XON_XOFF_INLINE;
-            flowControlFilter = new XonXoffFilter();
-        } else {
-            usbSerialPort.setFlowControl(target);
-            controlLines.flowControl = target;
-            flowControlFilter = target == UsbSerialPort.FlowControl.XON_XOFF_INLINE ? new XonXoffFilter() : null;
+            controlLines.flowControl = UsbSerialPort.FlowControl.NONE;
+            controlLines.start();
+        } catch (Exception e) {
+            controlLines.flowControl = UsbSerialPort.FlowControl.NONE;
+            status(getString(R.string.status_set_flow_control_failed, e.getClass().getName(), e.getMessage()));
         }
     }
 
@@ -679,8 +609,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private void receive(ArrayDeque<byte[]> datas) {
         SpannableStringBuilder spn = new SpannableStringBuilder();
         for (byte[] data : datas) {
-            if (flowControlFilter != null)
-                data = flowControlFilter.filter(data);
             appendCommunicationLog("RX", data);
             if (hexEnabled) {
                 spn.append(TextUtil.toHexString(data)).append('\n');
@@ -1145,7 +1073,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onSerialConnect() {
         status(getString(R.string.status_connected));
         connected = Connected.True;
-        applyPreferredFlowControl(false);
+        applyNoFlowControl();
         controlLines.start();
         updateKeepScreenOn(true);
     }
@@ -1274,64 +1202,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         void onPrepareOptionsMenu(Menu menu) {
             try {
                 EnumSet<UsbSerialPort.ControlLine> scl = usbSerialPort.getSupportedControlLines();
-                EnumSet<UsbSerialPort.FlowControl> sfc = usbSerialPort.getSupportedFlowControl();
                 menu.findItem(R.id.controlLines).setEnabled(!scl.isEmpty());
                 menu.findItem(R.id.controlLines).setChecked(showControlLines);
             } catch (Exception ignored) {
             }
-        }
-
-        void selectFlowControl() {
-            EnumSet<UsbSerialPort.FlowControl> sfc = usbSerialPort.getSupportedFlowControl();
-            UsbSerialPort.FlowControl fc = getEffectiveFlowControl();
-            ArrayList<String> names = new ArrayList<>();
-            ArrayList<UsbSerialPort.FlowControl> values = new ArrayList<>();
-            int pos = 0;
-            names.add(getString(R.string.flow_control_none));
-            values.add(UsbSerialPort.FlowControl.NONE);
-            if (sfc.contains(UsbSerialPort.FlowControl.RTS_CTS)) {
-                names.add(getString(R.string.flow_control_rts_cts));
-                values.add(UsbSerialPort.FlowControl.RTS_CTS);
-                if (fc == UsbSerialPort.FlowControl.RTS_CTS) pos = names.size() -1;
-            }
-            if (sfc.contains(UsbSerialPort.FlowControl.DTR_DSR)) {
-                names.add(getString(R.string.flow_control_dtr_dsr));
-                values.add(UsbSerialPort.FlowControl.DTR_DSR);
-                if (fc == UsbSerialPort.FlowControl.DTR_DSR) pos = names.size() - 1;
-            }
-            if (sfc.contains(UsbSerialPort.FlowControl.XON_XOFF)) {
-                names.add(getString(R.string.flow_control_xon_xoff));
-                values.add(UsbSerialPort.FlowControl.XON_XOFF);
-                if (fc == UsbSerialPort.FlowControl.XON_XOFF) pos = names.size() - 1;
-            }
-            if (sfc.contains(UsbSerialPort.FlowControl.XON_XOFF_INLINE) || !sfc.contains(UsbSerialPort.FlowControl.XON_XOFF)) {
-                names.add(getString(R.string.flow_control_xon_xoff));
-                values.add(UsbSerialPort.FlowControl.XON_XOFF_INLINE);
-                if (fc == UsbSerialPort.FlowControl.XON_XOFF_INLINE) pos = names.size() - 1;
-            }
-            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle(R.string.dialog_flow_control);
-            builder.setSingleChoiceItems(names.toArray(new CharSequence[0]), pos, (dialog, which) -> {
-                dialog.dismiss();
-                try {
-                    flowControl = values.get(which);
-                    setFlowControlMode(flowControl);
-                    start();
-                } catch (Exception e) {
-                    status(getString(R.string.status_set_flow_control_failed, e.getClass().getName(), e.getMessage()));
-                    flowControl = UsbSerialPort.FlowControl.NONE;
-                    flowControlFilter = null;
-                    start();
-                }
-            });
-            builder.setNegativeButton(R.string.dialog_cancel, (dialog, which) -> dialog.dismiss());
-            builder.setNeutralButton(R.string.dialog_info, (dialog, which) -> {
-                dialog.dismiss();
-                AlertDialog.Builder builder2 = new AlertDialog.Builder(getActivity());
-                builder2.setTitle(R.string.dialog_flow_control).setMessage(R.string.dialog_flow_control_info_message);
-                builder2.create().show();
-            });
-            builder.create().show();
         }
 
         public boolean showControlLines(boolean show) {
@@ -1356,13 +1230,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
             frame.setVisibility(showControlLines ? View.VISIBLE : View.GONE);
-            if(flowControl == UsbSerialPort.FlowControl.NONE) {
-                sendAllowed = true;
-                updateSendBtn(SendButtonState.Idle);
-            }
+            sendAllowed = true;
+            updateSendBtn(SendButtonState.Idle);
 
             mainLooper.removeCallbacks(runnable);
-            if (showControlLines || flowControl != UsbSerialPort.FlowControl.NONE) {
+            if (showControlLines) {
                 run();
             }
         }
@@ -1391,16 +1263,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     if(dsrBtn.isChecked() != lines.contains(UsbSerialPort.ControlLine.DSR)) dsrBtn.setChecked(!dsrBtn.isChecked());
                     if(cdBtn.isChecked()  != lines.contains(UsbSerialPort.ControlLine.CD))  cdBtn.setChecked(!cdBtn.isChecked());
                     if(riBtn.isChecked()  != lines.contains(UsbSerialPort.ControlLine.RI))  riBtn.setChecked(!riBtn.isChecked());
-                }
-                if (flowControl != UsbSerialPort.FlowControl.NONE) {
-                    switch (getEffectiveFlowControl()) {
-                        case DTR_DSR:         sendAllowed = usbSerialPort.getDSR(); break;
-                        case RTS_CTS:         sendAllowed = usbSerialPort.getCTS(); break;
-                        case XON_XOFF:        sendAllowed = usbSerialPort.getXON(); break;
-                        case XON_XOFF_INLINE: sendAllowed = flowControlFilter != null && flowControlFilter.getXON(); break;
-                        default:              sendAllowed = true;
-                    }
-                    updateSendBtn(sendAllowed ? SendButtonState.Idle : SendButtonState.Disabled);
                 }
                 mainLooper.postDelayed(runnable, refreshInterval);
             } catch (IOException e) {

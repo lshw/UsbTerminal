@@ -27,11 +27,6 @@
         android:checkable="true"
         app:showAsAction="never" />
     <item
-        android:id="@+id/xonXoffMode"
-        android:title="@string/xon_xoff_mode"
-        android:checkable="true"
-        app:showAsAction="never" />
-    <item
         android:id="@+id/shareLatestLog"
         android:title="@string/logs_open_latest"
         app:showAsAction="never" />
