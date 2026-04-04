@@ -8,12 +8,8 @@
         android:id="@+id/baud_rate"
         android:title="@string/menu_baud_rate" />
     <item
-        android:id="@+id/openLatestLog"
-        android:title="@string/logs_open_latest"
-        app:showAsAction="ifRoom" />
-    <item
         android:id="@+id/shareLatestLog"
-        android:title="@string/logs_open_communication"
+        android:title="@string/logs_open_latest"
         app:showAsAction="never" />
     <item
         android:id="@+id/language"

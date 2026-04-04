@@ -21,8 +21,6 @@
     <string name="hex_toggle_too_fast">HEXモードの切り替えは1秒に1回までです</string>
     <string name="logs_open">ログフォルダーを開く</string>
     <string name="logs_open_latest">最新のログを開く</string>
-    <string name="logs_share_latest">最新のログを共有</string>
-    <string name="logs_open_communication">通信ログを開く</string>
     <string name="logs_open_failed">ログフォルダーを開けません</string>
     <string name="logs_open_fallback">ダウンロードフォルダーを開きました。%1$s に移動してください</string>
     <string name="logs_latest_missing">利用可能なログファイルがまだありません</string>

@@ -21,8 +21,6 @@
     <string name="hex_toggle_too_fast">HEX 模式切换不能快于 1 秒</string>
     <string name="logs_open">浏览日志目录</string>
     <string name="logs_open_latest">打开最新日志</string>
-    <string name="logs_share_latest">分享最新日志</string>
-    <string name="logs_open_communication">打开通讯日志</string>
     <string name="logs_open_failed">无法打开日志目录</string>
     <string name="logs_open_fallback">已打开下载目录，请进入 %1$s</string>
     <string name="logs_latest_missing">还没有可用的日志文件</string>

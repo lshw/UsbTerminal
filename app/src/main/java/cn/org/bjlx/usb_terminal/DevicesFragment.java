@@ -106,9 +106,6 @@ public class DevicesFragment extends ListFragment {
         } else if (id ==R.id.baud_rate) {
             showCommunicationSettingsDialog();
             return true;
-        } else if (id == R.id.openLatestLog) {
-            ((MainActivity) requireActivity()).openLatestLog();
-            return true;
         } else if (id == R.id.shareLatestLog) {
             ((MainActivity) requireActivity()).shareLatestLog();
             return true;

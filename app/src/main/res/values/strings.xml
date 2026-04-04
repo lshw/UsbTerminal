@@ -22,8 +22,6 @@
     <string name="hex_toggle_too_fast">HEX mode cannot be toggled faster than once per second</string>
     <string name="logs_open">Open log directory</string>
     <string name="logs_open_latest">Open latest log</string>
-    <string name="logs_share_latest">Share latest log</string>
-    <string name="logs_open_communication">Open communication logs</string>
     <string name="logs_open_failed">Unable to open log directory</string>
     <string name="logs_open_fallback">Downloads opened. Please navigate to %1$s</string>
     <string name="logs_latest_missing">No log file is available yet</string>

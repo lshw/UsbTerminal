@@ -117,7 +117,7 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
     void openLatestLog() {
         Uri uri = LogFiles.getLatestLogUri(this);
         if (uri == null) {
-            Toast.makeText(this, R.string.logs_latest_missing, Toast.LENGTH_SHORT).show();
+            openLogsDirectory();
             return;
         }
         Intent intent = new Intent(Intent.ACTION_VIEW)
@@ -127,11 +127,15 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
         try {
             startActivity(Intent.createChooser(intent, getString(R.string.logs_open_latest)));
         } catch (Exception e) {
-            Toast.makeText(this, R.string.logs_open_failed, Toast.LENGTH_SHORT).show();
+            openLogsDirectory();
         }
     }
 
     void shareLatestLog() {
+        openLatestLog();
+    }
+
+    private void openLogsDirectory() {
         Intent intent = new Intent(Intent.ACTION_VIEW)
                 .setDataAndType(LogFiles.getLogsDirectoryUri(), DocumentsContract.Document.MIME_TYPE_DIR)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

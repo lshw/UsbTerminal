@@ -379,9 +379,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             setXonXoffEnabled(!xonXoffEnabled, true);
             item.setChecked(xonXoffEnabled);
             return true;
-        } else if (id == R.id.openLatestLog) {
-            ((MainActivity) requireActivity()).openLatestLog();
-            return true;
         } else if (id == R.id.shareLatestLog) {
             ((MainActivity) requireActivity()).shareLatestLog();
             return true;
