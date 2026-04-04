@@ -115,20 +115,7 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
     }
 
     void openLatestLog() {
-        Uri uri = LogFiles.getLatestLogUri(this);
-        if (uri == null) {
-            openLogsDirectory();
-            return;
-        }
-        Intent intent = new Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "text/plain")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        try {
-            startActivity(Intent.createChooser(intent, getString(R.string.logs_open_latest)));
-        } catch (Exception e) {
-            openLogsDirectory();
-        }
+        openLogsDirectory();
     }
 
     private void openLogsDirectory() {

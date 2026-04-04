@@ -9,7 +9,7 @@
         android:title="@string/menu_baud_rate" />
     <item
         android:id="@+id/shareLatestLog"
-        android:title="@string/logs_open_latest"
+        android:title="@string/logs_open"
         app:showAsAction="never" />
     <item
         android:id="@+id/language"
