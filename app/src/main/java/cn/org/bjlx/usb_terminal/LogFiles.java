@@ -16,8 +16,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 final class LogFiles {
-    private static final String PUBLIC_LOGS_SUBDIR = "SimpleUsbTerminal/logs";
-    private static final String PUBLIC_LOGS_DIR = Environment.DIRECTORY_DOWNLOADS + "/SimpleUsbTerminal/logs";
+    private static final String PUBLIC_LOGS_SUBDIR = "UsbTerminal";
+    private static final String PUBLIC_LOGS_DIR = Environment.DIRECTORY_DOWNLOADS + "/UsbTerminal";
     private static final String PUBLIC_LOGS_RELATIVE_PATH = PUBLIC_LOGS_DIR + "/";
 
     private LogFiles() {
