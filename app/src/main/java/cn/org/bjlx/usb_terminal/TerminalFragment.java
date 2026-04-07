@@ -846,7 +846,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (commLogWriter != null || commLogStream != null) {
             return true;
         }
-        String fileName = "comm-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date()) + ".log";
+        String fileName = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date()) + ".txt";
         commLogLocation = LogFiles.getLogLocation(requireContext(), fileName);
         try {
             if (LogFiles.usesPublicLogs()) {
