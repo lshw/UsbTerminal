@@ -8,6 +8,9 @@
         android:id="@+id/baud_rate"
         android:title="@string/menu_baud_rate" />
     <item
+        android:id="@+id/smartConfigEsp32"
+        android:title="@string/menu_smart_config_esp32" />
+    <item
         android:id="@+id/shareLatestLog"
         android:title="@string/logs_open"
         app:showAsAction="never" />

@@ -2,13 +2,19 @@ package cn.org.bjlx.usb_terminal;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.ListFragment;
+import android.Manifest;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -16,17 +22,24 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Toast;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
+import android.text.TextUtils;
 
+import com.espressif.iot.esptouch.EsptouchTask;
+import com.espressif.iot.esptouch.IEsptouchResult;
+import com.espressif.iot.esptouch.IEsptouchTask;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class DevicesFragment extends ListFragment {
+    private static final int SMART_CONFIG_PERMISSION_REQUEST_CODE = 3001;
 
     static class ListItem {
         UsbDevice device;
@@ -46,6 +59,11 @@ public class DevicesFragment extends ListFragment {
     private int dataBits = 8;
     private int parity = 0;
     private int stopBits = 1;
+    private boolean smartConfigInProgress;
+    private boolean pendingSmartConfigDialogAfterPermission;
+    private volatile IEsptouchTask smartConfigTask;
+    @Nullable
+    private AlertDialog smartConfigProgressDialog;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -95,6 +113,13 @@ public class DevicesFragment extends ListFragment {
     }
 
     @Override
+    public void onDestroy() {
+        cancelSmartConfigTask();
+        dismissSmartConfigProgressDialog();
+        super.onDestroy();
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         if(id == R.id.refresh) {
@@ -102,6 +127,20 @@ public class DevicesFragment extends ListFragment {
             return true;
         } else if (id ==R.id.baud_rate) {
             showCommunicationSettingsDialog();
+            return true;
+        } else if (id == R.id.smartConfigEsp32) {
+            if (smartConfigInProgress) {
+                showSmartConfigToast(R.string.status_smart_config_busy);
+                return true;
+            }
+            if (!ensureSmartConfigPermission()) {
+                pendingSmartConfigDialogAfterPermission = true;
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        SMART_CONFIG_PERMISSION_REQUEST_CODE);
+                showSmartConfigToast(R.string.status_smart_config_permission_required);
+                return true;
+            }
+            showSmartConfigDialog();
             return true;
         } else if (id == R.id.shareLatestLog) {
             ((MainActivity) requireActivity()).openLatestLog();
@@ -156,6 +195,197 @@ public class DevicesFragment extends ListFragment {
                 .show();
     }
 
+    private void showSmartConfigDialog() {
+        String ssid = getConnectedWifiSsid();
+        if (TextUtils.isEmpty(ssid)) {
+            showSmartConfigToast(R.string.status_smart_config_wifi_unavailable);
+            return;
+        }
+        if (isConnectedWifi5G()) {
+            showSmartConfigToast(R.string.status_smart_config_wifi_5g);
+            return;
+        }
+
+        View dialogView = requireActivity().getLayoutInflater().inflate(R.layout.dialog_smart_config, null, false);
+        EditText ssidView = dialogView.findViewById(R.id.smart_config_ssid);
+        EditText passwordView = dialogView.findViewById(R.id.smart_config_password);
+        ssidView.setText(ssid);
+        ssidView.setSelection(ssid.length());
+
+        AlertDialog dialog = new AlertDialog.Builder(requireActivity())
+                .setTitle(R.string.dialog_smart_config_title)
+                .setView(dialogView)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.dialog_smart_config_start, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String inputSsid = ssidView.getText() == null ? "" : ssidView.getText().toString().trim();
+            String password = passwordView.getText() == null ? "" : passwordView.getText().toString();
+            if (TextUtils.isEmpty(inputSsid)) {
+                showSmartConfigToast(R.string.status_smart_config_ssid_required);
+                ssidView.requestFocus();
+                return;
+            }
+            dialog.dismiss();
+            startSmartConfig(inputSsid, password);
+        }));
+        dialog.show();
+    }
+
+    private void startSmartConfig(String ssid, String password) {
+        if (smartConfigInProgress) {
+            showSmartConfigToast(R.string.status_smart_config_busy);
+            return;
+        }
+        String bssid = getConnectedWifiBssid();
+        if (TextUtils.isEmpty(bssid)) {
+            showSmartConfigToast(R.string.status_smart_config_bssid_unavailable);
+            return;
+        }
+        smartConfigInProgress = true;
+        showSmartConfigToast(getString(R.string.status_smart_config_starting, ssid));
+        showSmartConfigProgressDialog();
+        Context appContext = requireContext().getApplicationContext();
+        new Thread(() -> runSmartConfig(appContext, ssid, bssid, password), "esp32-smart-config-devices").start();
+    }
+
+    private void runSmartConfig(Context context, String ssid, String bssid, String password) {
+        try {
+            IEsptouchTask task = new EsptouchTask(ssid, bssid, password, context);
+            task.setPackageBroadcast(true);
+            smartConfigTask = task;
+            List<IEsptouchResult> results = task.executeForResults(1);
+            if (isAdded()) {
+                requireActivity().runOnUiThread(() -> finishSmartConfig(results, null));
+            }
+        } catch (Exception e) {
+            if (isAdded()) {
+                requireActivity().runOnUiThread(() -> finishSmartConfig(null, e));
+            }
+        } finally {
+            smartConfigTask = null;
+        }
+    }
+
+    private void finishSmartConfig(@Nullable List<IEsptouchResult> results, @Nullable Exception error) {
+        dismissSmartConfigProgressDialog();
+        smartConfigInProgress = false;
+        if (!isAdded()) {
+            return;
+        }
+        if (error != null) {
+            String message = TextUtils.isEmpty(error.getMessage()) ? error.getClass().getSimpleName() : error.getMessage();
+            showSmartConfigToast(getString(R.string.status_smart_config_failed, message));
+            return;
+        }
+        if (results == null || results.isEmpty()) {
+            showSmartConfigToast(R.string.status_smart_config_timeout);
+            return;
+        }
+        IEsptouchResult result = results.get(0);
+        if (result.isCancelled()) {
+            showSmartConfigToast(R.string.status_smart_config_cancelled);
+            return;
+        }
+        if (!result.isSuc()) {
+            showSmartConfigToast(R.string.status_smart_config_timeout);
+            return;
+        }
+        String ip = result.getInetAddress() == null ? "-" : result.getInetAddress().getHostAddress();
+        String mac = TextUtils.isEmpty(result.getBssid()) ? "-" : result.getBssid();
+        showSmartConfigToast(getString(R.string.status_smart_config_success, mac, ip));
+    }
+
+    private void showSmartConfigProgressDialog() {
+        dismissSmartConfigProgressDialog();
+        smartConfigProgressDialog = new AlertDialog.Builder(requireActivity())
+                .setTitle(R.string.dialog_smart_config_title)
+                .setMessage(R.string.status_smart_config_running)
+                .setCancelable(false)
+                .setNegativeButton(android.R.string.cancel, (dialog, which) -> cancelSmartConfigTask())
+                .create();
+        smartConfigProgressDialog.show();
+    }
+
+    private void dismissSmartConfigProgressDialog() {
+        if (smartConfigProgressDialog != null) {
+            smartConfigProgressDialog.dismiss();
+            smartConfigProgressDialog = null;
+        }
+    }
+
+    private void cancelSmartConfigTask() {
+        IEsptouchTask task = smartConfigTask;
+        if (task != null) {
+            task.interrupt();
+        }
+    }
+
+    private boolean ensureSmartConfigPermission() {
+        return android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M
+                || ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Nullable
+    private WifiInfo getCurrentWifiInfo() {
+        WifiManager wifiManager = (WifiManager) requireContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        if (wifiManager == null) {
+            return null;
+        }
+        try {
+            return wifiManager.getConnectionInfo();
+        } catch (SecurityException e) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private String getConnectedWifiSsid() {
+        WifiInfo wifiInfo = getCurrentWifiInfo();
+        if (wifiInfo == null) {
+            return null;
+        }
+        String ssid = wifiInfo.getSSID();
+        if (TextUtils.isEmpty(ssid) || "<unknown ssid>".equalsIgnoreCase(ssid)) {
+            return null;
+        }
+        if (ssid.length() >= 2 && ssid.startsWith("\"") && ssid.endsWith("\"")) {
+            ssid = ssid.substring(1, ssid.length() - 1);
+        }
+        return TextUtils.isEmpty(ssid) ? null : ssid;
+    }
+
+    @Nullable
+    private String getConnectedWifiBssid() {
+        WifiInfo wifiInfo = getCurrentWifiInfo();
+        if (wifiInfo == null) {
+            return null;
+        }
+        String bssid = wifiInfo.getBSSID();
+        if (TextUtils.isEmpty(bssid) || "02:00:00:00:00:00".equals(bssid)) {
+            return null;
+        }
+        return bssid;
+    }
+
+    private boolean isConnectedWifi5G() {
+        WifiInfo wifiInfo = getCurrentWifiInfo();
+        if (wifiInfo == null || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.LOLLIPOP) {
+            return false;
+        }
+        int frequency = wifiInfo.getFrequency();
+        return frequency >= 4900 && frequency <= 5900;
+    }
+
+    private void showSmartConfigToast(int messageResId) {
+        showSmartConfigToast(getString(messageResId));
+    }
+
+    private void showSmartConfigToast(String message) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
+    }
+
     void refresh() {
         UsbManager usbManager = (UsbManager) getActivity().getSystemService(Context.USB_SERVICE);
         UsbSerialProber usbDefaultProber = UsbSerialProber.getDefaultProber();
@@ -195,6 +425,22 @@ public class DevicesFragment extends ListFragment {
             fragment.setArguments(args);
             getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment, "terminal").addToBackStack(null).commit();
         }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == SMART_CONFIG_PERMISSION_REQUEST_CODE) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            boolean reopenDialog = pendingSmartConfigDialogAfterPermission && granted;
+            pendingSmartConfigDialogAfterPermission = false;
+            if (reopenDialog) {
+                showSmartConfigDialog();
+            } else if (!granted) {
+                showSmartConfigToast(R.string.status_smart_config_permission_denied);
+            }
+            return;
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
 }

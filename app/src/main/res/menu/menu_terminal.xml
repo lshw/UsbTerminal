@@ -45,6 +45,10 @@
         android:title="@string/menu_send_break"
         app:showAsAction="never" />
     <item
+        android:id="@+id/smartConfigEsp32"
+        android:title="@string/menu_smart_config_esp32"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/language"
         android:title="@string/menu_language"
         app:showAsAction="never" />
