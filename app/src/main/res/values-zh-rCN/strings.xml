@@ -75,4 +75,5 @@
     <string name="language_traditional_chinese">繁體中文</string>
     <string name="language_english">English</string>
     <string name="language_japanese">日本語</string>
+    <string name="status_smart_config_ack_success">收到客户端 ACK，配网成功。ESP32 MAC：%1$s，IP：%2$s</string>
 </resources>

@@ -665,13 +665,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             status(getString(R.string.status_smart_config_cancelled));
             return;
         }
-        if (!result.isSuc()) {
+        if (!hasSmartConfigAck(result)) {
             status(getString(R.string.status_smart_config_timeout));
             return;
         }
         String ip = result.getInetAddress() == null ? "-" : result.getInetAddress().getHostAddress();
         String mac = TextUtils.isEmpty(result.getBssid()) ? "-" : result.getBssid();
-        status(getString(R.string.status_smart_config_success, mac, ip));
+        status(getString(R.string.status_smart_config_ack_success, mac, ip));
+    }
+
+    private boolean hasSmartConfigAck(@Nullable IEsptouchResult result) {
+        return result != null && !result.isCancelled() && result.isSuc();
     }
 
     private void showSmartConfigProgressDialog() {
