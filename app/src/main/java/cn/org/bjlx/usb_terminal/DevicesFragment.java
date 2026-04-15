@@ -358,6 +358,9 @@ public class DevicesFragment extends ListFragment {
         }
         String ip = result.getInetAddress() == null ? "-" : result.getInetAddress().getHostAddress();
         String mac = TextUtils.isEmpty(result.getBssid()) ? "-" : result.getBssid();
+        if (!TextUtils.isEmpty(ip) && !"-".equals(ip)) {
+            SmartConfigSessionState.setLastTelnetHost(ip);
+        }
         showSmartConfigResultDialog(getString(R.string.status_smart_config_ack_success, mac, ip));
     }
 
