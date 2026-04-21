@@ -11,13 +11,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.ServiceConnection;
-import android.content.pm.PackageManager;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -755,63 +752,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (task != null) {
             task.interrupt();
         }
-    }
-
-    private boolean ensureSmartConfigPermission() {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M
-                || ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED;
-    }
-
-    @Nullable
-    private WifiInfo getCurrentWifiInfo() {
-        WifiManager wifiManager = (WifiManager) requireContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        if (wifiManager == null) {
-            return null;
-        }
-        try {
-            return wifiManager.getConnectionInfo();
-        } catch (SecurityException e) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private String getConnectedWifiSsid() {
-        WifiInfo wifiInfo = getCurrentWifiInfo();
-        if (wifiInfo == null) {
-            return null;
-        }
-        String ssid = wifiInfo.getSSID();
-        if (TextUtils.isEmpty(ssid) || "<unknown ssid>".equalsIgnoreCase(ssid)) {
-            return null;
-        }
-        if (ssid.length() >= 2 && ssid.startsWith("\"") && ssid.endsWith("\"")) {
-            ssid = ssid.substring(1, ssid.length() - 1);
-        }
-        return TextUtils.isEmpty(ssid) ? null : ssid;
-    }
-
-    @Nullable
-    private String getConnectedWifiBssid() {
-        WifiInfo wifiInfo = getCurrentWifiInfo();
-        if (wifiInfo == null) {
-            return null;
-        }
-        String bssid = wifiInfo.getBSSID();
-        if (TextUtils.isEmpty(bssid) || "02:00:00:00:00:00".equals(bssid)) {
-            return null;
-        }
-        return bssid;
-    }
-
-    private boolean isConnectedWifi5G() {
-        WifiInfo wifiInfo = getCurrentWifiInfo();
-        if (wifiInfo == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            return false;
-        }
-        int frequency = wifiInfo.getFrequency();
-        return frequency >= 4900 && frequency <= 5900;
     }
 
     private boolean isUsbConnection() {
