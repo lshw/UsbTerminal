@@ -573,7 +573,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_smart_config, null, false);
         EditText ssidView = dialogView.findViewById(R.id.smart_config_ssid);
         EditText passwordView = dialogView.findViewById(R.id.smart_config_password);
+        String lastSsid = SmartConfigSessionState.getLastSsid();
         String lastPassword = SmartConfigSessionState.getLastPassword();
+        if (lastSsid != null) {
+            ssidView.setText(lastSsid);
+            ssidView.setSelection(lastSsid.length());
+        }
         if (lastPassword != null) {
             passwordView.setText(lastPassword);
             passwordView.setSelection(lastPassword.length());
@@ -593,6 +598,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 ssidView.requestFocus();
                 return;
             }
+            SmartConfigSessionState.setLastSsid(inputSsid);
             SmartConfigSessionState.setLastPassword(password);
             dialog.dismiss();
             startSmartConfig(inputSsid, password);
