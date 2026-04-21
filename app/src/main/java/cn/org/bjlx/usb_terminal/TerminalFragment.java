@@ -45,6 +45,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -73,6 +74,7 @@ import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TerminalFragment extends Fragment implements ServiceConnection, SerialListener {
 
@@ -121,6 +123,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private boolean smartConfigInProgress;
     private boolean pendingSmartConfigDialogAfterPermission;
     private volatile IEsptouchTask smartConfigTask;
+    private final AtomicBoolean smartConfigCompletionHandled = new AtomicBoolean();
+    private boolean smartConfigCancelledByUser;
     @Nullable
     private AlertDialog smartConfigProgressDialog;
 
@@ -584,12 +588,16 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             status(getString(R.string.status_smart_config_wifi_5g));
             return;
         }
-
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_smart_config, null, false);
         EditText ssidView = dialogView.findViewById(R.id.smart_config_ssid);
         EditText passwordView = dialogView.findViewById(R.id.smart_config_password);
+        String lastPassword = SmartConfigSessionState.getLastPassword();
         ssidView.setText(ssid);
         ssidView.setSelection(ssid.length());
+        if (lastPassword != null) {
+            passwordView.setText(lastPassword);
+            passwordView.setSelection(lastPassword.length());
+        }
 
         AlertDialog dialog = new AlertDialog.Builder(requireActivity())
                 .setTitle(R.string.dialog_smart_config_title)
@@ -605,6 +613,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 ssidView.requestFocus();
                 return;
             }
+            SmartConfigSessionState.setLastPassword(password);
             dialog.dismiss();
             startSmartConfig(inputSsid, password);
         }));
@@ -622,6 +631,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             return;
         }
         smartConfigInProgress = true;
+        smartConfigCancelledByUser = false;
+        smartConfigCompletionHandled.set(false);
         requireActivity().invalidateOptionsMenu();
         status(getString(R.string.status_smart_config_starting, ssid));
         status(getString(R.string.status_smart_config_running));
@@ -634,14 +645,27 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         try {
             IEsptouchTask task = new EsptouchTask(ssid, bssid, password, context);
             task.setPackageBroadcast(true);
+            task.setEsptouchListener(result -> {
+                if (hasSmartConfigAck(result)) {
+                    mainLooper.post(() -> finishSmartConfigIfPending(List.of(result), null));
+                    task.interrupt();
+                }
+            });
             smartConfigTask = task;
             List<IEsptouchResult> results = task.executeForResults(1);
-            mainLooper.post(() -> finishSmartConfig(results, null));
+            mainLooper.post(() -> finishSmartConfigIfPending(results, null));
         } catch (Exception e) {
-            mainLooper.post(() -> finishSmartConfig(null, e));
+            mainLooper.post(() -> finishSmartConfigIfPending(null, e));
         } finally {
             smartConfigTask = null;
         }
+    }
+
+    private void finishSmartConfigIfPending(@Nullable List<IEsptouchResult> results, @Nullable Exception error) {
+        if (!smartConfigCompletionHandled.compareAndSet(false, true)) {
+            return;
+        }
+        finishSmartConfig(results, error);
     }
 
     private void finishSmartConfig(@Nullable List<IEsptouchResult> results, @Nullable Exception error) {
@@ -651,6 +675,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             return;
         }
         requireActivity().invalidateOptionsMenu();
+        if (smartConfigCancelledByUser) {
+            smartConfigCancelledByUser = false;
+            return;
+        }
         if (error != null) {
             String message = TextUtils.isEmpty(error.getMessage()) ? error.getClass().getSimpleName() : error.getMessage();
             status(getString(R.string.status_smart_config_failed, message));
@@ -697,6 +725,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void cancelSmartConfigTask() {
+        smartConfigCancelledByUser = true;
+        smartConfigCompletionHandled.set(true);
+        smartConfigInProgress = false;
+        dismissSmartConfigProgressDialog();
+        if (isAdded()) {
+            requireActivity().invalidateOptionsMenu();
+        }
         IEsptouchTask task = smartConfigTask;
         if (task != null) {
             task.interrupt();

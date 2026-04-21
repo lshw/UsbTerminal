@@ -28,7 +28,7 @@
         android:layout_marginTop="12dp"
         android:hint="@string/dialog_smart_config_password"
         android:imeOptions="actionDone"
-        android:inputType="textPassword"
+        android:inputType="text|textNoSuggestions"
         android:maxLines="1" />
 
 </LinearLayout>

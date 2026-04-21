@@ -37,6 +37,7 @@ import com.hoho.android.usbserial.driver.UsbSerialProber;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class DevicesFragment extends ListFragment {
     private static final int SMART_CONFIG_PERMISSION_REQUEST_CODE = 3001;
@@ -62,6 +63,8 @@ public class DevicesFragment extends ListFragment {
     private boolean smartConfigInProgress;
     private boolean pendingSmartConfigDialogAfterPermission;
     private volatile IEsptouchTask smartConfigTask;
+    private final AtomicBoolean smartConfigCompletionHandled = new AtomicBoolean();
+    private boolean smartConfigCancelledByUser;
     @Nullable
     private AlertDialog smartConfigProgressDialog;
 
@@ -205,12 +208,16 @@ public class DevicesFragment extends ListFragment {
             showSmartConfigToast(R.string.status_smart_config_wifi_5g);
             return;
         }
-
         View dialogView = requireActivity().getLayoutInflater().inflate(R.layout.dialog_smart_config, null, false);
         EditText ssidView = dialogView.findViewById(R.id.smart_config_ssid);
         EditText passwordView = dialogView.findViewById(R.id.smart_config_password);
+        String lastPassword = SmartConfigSessionState.getLastPassword();
         ssidView.setText(ssid);
         ssidView.setSelection(ssid.length());
+        if (lastPassword != null) {
+            passwordView.setText(lastPassword);
+            passwordView.setSelection(lastPassword.length());
+        }
 
         AlertDialog dialog = new AlertDialog.Builder(requireActivity())
                 .setTitle(R.string.dialog_smart_config_title)
@@ -226,6 +233,7 @@ public class DevicesFragment extends ListFragment {
                 ssidView.requestFocus();
                 return;
             }
+            SmartConfigSessionState.setLastPassword(password);
             dialog.dismiss();
             startSmartConfig(inputSsid, password);
         }));
@@ -243,6 +251,8 @@ public class DevicesFragment extends ListFragment {
             return;
         }
         smartConfigInProgress = true;
+        smartConfigCancelledByUser = false;
+        smartConfigCompletionHandled.set(false);
         showSmartConfigToast(getString(R.string.status_smart_config_starting, ssid));
         showSmartConfigProgressDialog();
         Context appContext = requireContext().getApplicationContext();
@@ -253,18 +263,31 @@ public class DevicesFragment extends ListFragment {
         try {
             IEsptouchTask task = new EsptouchTask(ssid, bssid, password, context);
             task.setPackageBroadcast(true);
+            task.setEsptouchListener(result -> {
+                if (hasSmartConfigAck(result) && isAdded()) {
+                    requireActivity().runOnUiThread(() -> finishSmartConfigIfPending(List.of(result), null));
+                    task.interrupt();
+                }
+            });
             smartConfigTask = task;
             List<IEsptouchResult> results = task.executeForResults(1);
             if (isAdded()) {
-                requireActivity().runOnUiThread(() -> finishSmartConfig(results, null));
+                requireActivity().runOnUiThread(() -> finishSmartConfigIfPending(results, null));
             }
         } catch (Exception e) {
             if (isAdded()) {
-                requireActivity().runOnUiThread(() -> finishSmartConfig(null, e));
+                requireActivity().runOnUiThread(() -> finishSmartConfigIfPending(null, e));
             }
         } finally {
             smartConfigTask = null;
         }
+    }
+
+    private void finishSmartConfigIfPending(@Nullable List<IEsptouchResult> results, @Nullable Exception error) {
+        if (!smartConfigCompletionHandled.compareAndSet(false, true)) {
+            return;
+        }
+        finishSmartConfig(results, error);
     }
 
     private void finishSmartConfig(@Nullable List<IEsptouchResult> results, @Nullable Exception error) {
@@ -273,27 +296,31 @@ public class DevicesFragment extends ListFragment {
         if (!isAdded()) {
             return;
         }
+        if (smartConfigCancelledByUser) {
+            smartConfigCancelledByUser = false;
+            return;
+        }
         if (error != null) {
             String message = TextUtils.isEmpty(error.getMessage()) ? error.getClass().getSimpleName() : error.getMessage();
-            showSmartConfigToast(getString(R.string.status_smart_config_failed, message));
+            showSmartConfigResultDialog(getString(R.string.status_smart_config_failed, message));
             return;
         }
         if (results == null || results.isEmpty()) {
-            showSmartConfigToast(R.string.status_smart_config_timeout);
+            showSmartConfigResultDialog(R.string.status_smart_config_timeout);
             return;
         }
         IEsptouchResult result = results.get(0);
         if (result.isCancelled()) {
-            showSmartConfigToast(R.string.status_smart_config_cancelled);
+            showSmartConfigResultDialog(R.string.status_smart_config_cancelled);
             return;
         }
         if (!hasSmartConfigAck(result)) {
-            showSmartConfigToast(R.string.status_smart_config_timeout);
+            showSmartConfigResultDialog(R.string.status_smart_config_timeout);
             return;
         }
         String ip = result.getInetAddress() == null ? "-" : result.getInetAddress().getHostAddress();
         String mac = TextUtils.isEmpty(result.getBssid()) ? "-" : result.getBssid();
-        showSmartConfigToast(getString(R.string.status_smart_config_ack_success, mac, ip));
+        showSmartConfigResultDialog(getString(R.string.status_smart_config_ack_success, mac, ip));
     }
 
     private boolean hasSmartConfigAck(@Nullable IEsptouchResult result) {
@@ -319,6 +346,10 @@ public class DevicesFragment extends ListFragment {
     }
 
     private void cancelSmartConfigTask() {
+        smartConfigCancelledByUser = true;
+        smartConfigCompletionHandled.set(true);
+        smartConfigInProgress = false;
+        dismissSmartConfigProgressDialog();
         IEsptouchTask task = smartConfigTask;
         if (task != null) {
             task.interrupt();
@@ -388,6 +419,22 @@ public class DevicesFragment extends ListFragment {
 
     private void showSmartConfigToast(String message) {
         Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
+    }
+
+    private void showSmartConfigResultDialog(int messageResId) {
+        showSmartConfigResultDialog(getString(messageResId));
+    }
+
+    private void showSmartConfigResultDialog(String message) {
+        View dialogView = requireActivity().getLayoutInflater()
+                .inflate(R.layout.dialog_smart_config_result, null, false);
+        TextView messageView = dialogView.findViewById(R.id.smart_config_result_message);
+        messageView.setText(message);
+        new AlertDialog.Builder(requireActivity())
+                .setTitle(R.string.dialog_smart_config_title)
+                .setView(dialogView)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
     }
 
     void refresh() {
