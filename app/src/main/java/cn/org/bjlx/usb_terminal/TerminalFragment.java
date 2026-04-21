@@ -73,6 +73,7 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TerminalFragment extends Fragment implements ServiceConnection, SerialListener {
+    private static final String TAG = "TerminalFragment";
 
     private enum Connected { False, Pending, True }
     private static final String PREFS_NAME = "terminal";
@@ -339,18 +340,28 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     public void onPrepareOptionsMenu(@NonNull Menu menu) {
+        boolean usbConnection = isUsbConnection();
+        boolean reconnectAvailable = !usbConnection && connected == Connected.False;
         menu.findItem(R.id.characterMode).setChecked(characterMode);
         menu.findItem(R.id.hex).setChecked(hexEnabled);
         menu.findItem(R.id.communicationLog).setChecked(commLogEnabled);
         menu.findItem(R.id.communicationLogHex).setChecked(commLogHex);
-        controlLines.onPrepareOptionsMenu(menu);
+        menu.findItem(R.id.controlLines).setEnabled(usbConnection);
+        if (usbConnection) {
+            controlLines.onPrepareOptionsMenu(menu);
+        } else {
+            menu.findItem(R.id.controlLines).setChecked(false);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             menu.findItem(R.id.backgroundNotification).setChecked(service != null && service.areNotificationsEnabled());
         } else {
             menu.findItem(R.id.backgroundNotification).setChecked(true);
             menu.findItem(R.id.backgroundNotification).setEnabled(false);
         }
-        menu.findItem(R.id.smartConfigEsp32).setEnabled(!smartConfigInProgress);
+        menu.findItem(R.id.reconnect).setVisible(reconnectAvailable);
+        menu.findItem(R.id.reconnect).setEnabled(reconnectAvailable);
+        menu.findItem(R.id.sendBreak).setEnabled(usbConnection);
+        menu.findItem(R.id.smartConfigEsp32).setEnabled(usbConnection && !smartConfigInProgress);
     }
 
     @Override
@@ -432,6 +443,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             } catch (Exception e) {
                 status(getString(R.string.status_send_break_failed, e.getMessage()));
             }
+            return true;
+        } else if (id == R.id.reconnect) {
+            reconnectPending = false;
+            connect();
+            requireActivity().invalidateOptionsMenu();
             return true;
         } else if (id == R.id.smartConfigEsp32) {
             if (smartConfigInProgress) {
