@@ -90,9 +90,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private static final int RECEIVE_RENDER_MAX_BYTES = 16 * 1024;
     private static final int RECEIVE_IMMEDIATE_DRAIN_THRESHOLD = 64 * 1024;
     private static final String SMART_CONFIG_BSSID = "00:00:00:00:00:00";
+    private static final String CONNECTION_TYPE_TELNET = "telnet";
     private final Handler mainLooper;
     private final BroadcastReceiver broadcastReceiver;
     private int deviceId, vendorId, productId, portNum, baudRate, dataBits, parity, stopBits;
+    private String connectionType;
+    private String telnetHost;
+    private int telnetPort;
     private UsbSerialPort usbSerialPort;
     private SerialService service;
 
@@ -172,6 +176,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
         setRetainInstance(true);
+        connectionType = getArguments().getString("connectionType", "usb");
+        telnetHost = getArguments().getString("host", "");
+        telnetPort = getArguments().getInt("networkPort", 23);
         deviceId = getArguments().getInt("device");
         vendorId = getArguments().getInt("vendor", -1);
         productId = getArguments().getInt("product", -1);
@@ -203,14 +210,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             service.attach(this);
         else
             getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
-        ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_NOT_EXPORTED);
-        ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED), ContextCompat.RECEIVER_NOT_EXPORTED);
-        ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED), ContextCompat.RECEIVER_NOT_EXPORTED);
+        if (isUsbConnection()) {
+            ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_GRANT_USB), ContextCompat.RECEIVER_NOT_EXPORTED);
+            ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED), ContextCompat.RECEIVER_NOT_EXPORTED);
+            ContextCompat.registerReceiver(getActivity(), broadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED), ContextCompat.RECEIVER_NOT_EXPORTED);
+        }
     }
 
     @Override
     public void onStop() {
-        getActivity().unregisterReceiver(broadcastReceiver);
+        if (isUsbConnection()) {
+            getActivity().unregisterReceiver(broadcastReceiver);
+        }
         if(service != null && !getActivity().isChangingConfigurations())
             service.detach();
         super.onStop();
@@ -476,6 +487,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void connect(Boolean permissionGranted) {
+        if (!isUsbConnection()) {
+            connectTelnet();
+            return;
+        }
         UsbManager usbManager = (UsbManager) getActivity().getSystemService(Context.USB_SERVICE);
         UsbDevice device = findDevice(usbManager);
         if(device == null) {
@@ -542,6 +557,23 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         updateSendBtn(SendButtonState.Idle);
         usbSerialPort = null;
         updateKeepScreenOn(false);
+        if (isAdded()) {
+            requireActivity().invalidateOptionsMenu();
+        }
+    }
+
+    private void connectTelnet() {
+        connected = Connected.Pending;
+        new Thread(() -> {
+            try {
+                TelnetSocket socket = new TelnetSocket(getActivity().getApplicationContext(), telnetHost, telnetPort);
+                service.connect(socket);
+                reconnectPending = false;
+                mainLooper.post(this::onSerialConnect);
+            } catch (Exception e) {
+                mainLooper.post(() -> onSerialConnectError(e));
+            }
+        }, "telnet-connect").start();
     }
 
     private UsbDevice findDevice(UsbManager usbManager) {
@@ -558,6 +590,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private boolean matchesDevice(UsbDevice device) {
+        if (!isUsbConnection()) {
+            return false;
+        }
         if (device == null) {
             return false;
         }
@@ -774,6 +809,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
         int frequency = wifiInfo.getFrequency();
         return frequency >= 4900 && frequency <= 5900;
+    }
+
+    private boolean isUsbConnection() {
+        return !CONNECTION_TYPE_TELNET.equals(connectionType);
     }
 
     private void postStatus(String message) {
@@ -1288,6 +1327,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
+    private String formatErrorMessage(@Nullable Exception e) {
+        if (e == null) {
+            return "unknown error";
+        }
+        String message = e.getMessage();
+        if (!TextUtils.isEmpty(message)) {
+            return message;
+        }
+        return e.getClass().getSimpleName();
+    }
+
     /*
      * starting with Android 14, notifications are not shown in notification bar by default when App is in background
      */
@@ -1317,11 +1367,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         applyNoFlowControl();
         controlLines.start();
         updateKeepScreenOn(true);
+        if (isAdded()) {
+            requireActivity().invalidateOptionsMenu();
+        }
     }
 
     @Override
     public void onSerialConnectError(Exception e) {
-        status(getString(R.string.status_connection_failed, e.getMessage()));
+        status(getString(R.string.status_connection_failed, formatErrorMessage(e)));
         disconnect(true);
     }
 
@@ -1336,7 +1389,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialIoError(Exception e) {
-        status(getString(R.string.status_connection_lost, e.getMessage()));
+        status(getString(R.string.status_connection_lost, formatErrorMessage(e)));
         disconnect(true);
     }
 

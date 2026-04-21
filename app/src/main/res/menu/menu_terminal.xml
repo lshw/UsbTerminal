@@ -45,6 +45,10 @@
         android:title="@string/menu_send_break"
         app:showAsAction="never" />
     <item
+        android:id="@+id/reconnect"
+        android:title="@string/menu_reconnect"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/smartConfigEsp32"
         android:title="@string/menu_smart_config_esp32"
         app:showAsAction="never" />

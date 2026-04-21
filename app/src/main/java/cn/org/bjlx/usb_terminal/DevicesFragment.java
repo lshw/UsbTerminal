@@ -132,6 +132,9 @@ public class DevicesFragment extends ListFragment {
             }
             showSmartConfigDialog();
             return true;
+        } else if (id == R.id.telnetClient) {
+            showTelnetDialog();
+            return true;
         } else if (id == R.id.shareLatestLog) {
             ((MainActivity) requireActivity()).openLatestLog();
             return true;
@@ -220,6 +223,64 @@ public class DevicesFragment extends ListFragment {
             startSmartConfig(inputSsid, password);
         }));
         dialog.show();
+    }
+
+    private void showTelnetDialog() {
+        View dialogView = requireActivity().getLayoutInflater().inflate(R.layout.dialog_telnet_connect, null, false);
+        EditText hostView = dialogView.findViewById(R.id.telnet_host);
+        EditText portView = dialogView.findViewById(R.id.telnet_port);
+        String lastHost = SmartConfigSessionState.getLastTelnetHost();
+        int lastPort = SmartConfigSessionState.getLastTelnetPort();
+        if (!TextUtils.isEmpty(lastHost)) {
+            hostView.setText(lastHost);
+            hostView.setSelection(lastHost.length());
+        }
+        portView.setText(String.valueOf(lastPort));
+        portView.setSelection(portView.getText().length());
+
+        AlertDialog dialog = new AlertDialog.Builder(requireActivity())
+                .setTitle(R.string.dialog_telnet_title)
+                .setView(dialogView)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.dialog_telnet_connect, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String host = hostView.getText() == null ? "" : hostView.getText().toString().trim();
+            String portText = portView.getText() == null ? "" : portView.getText().toString().trim();
+            if (TextUtils.isEmpty(host)) {
+                showSmartConfigToast(R.string.status_telnet_host_required);
+                hostView.requestFocus();
+                return;
+            }
+            int port;
+            try {
+                port = Integer.parseInt(portText);
+            } catch (Exception e) {
+                showSmartConfigToast(R.string.status_telnet_port_invalid);
+                portView.requestFocus();
+                return;
+            }
+            if (port < 1 || port > 65535) {
+                showSmartConfigToast(R.string.status_telnet_port_invalid);
+                portView.requestFocus();
+                return;
+            }
+            SmartConfigSessionState.setLastTelnetHost(host);
+            SmartConfigSessionState.setLastTelnetPort(port);
+            dialog.dismiss();
+            openTelnetTerminal(host, port);
+        }));
+        dialog.show();
+    }
+
+    private void openTelnetTerminal(String host, int port) {
+        Bundle args = new Bundle();
+        args.putString("connectionType", "telnet");
+        args.putString("host", host);
+        args.putInt("networkPort", port);
+        Fragment fragment = new TerminalFragment();
+        fragment.setArguments(args);
+        getParentFragmentManager().beginTransaction().replace(R.id.fragment, fragment, "terminal").addToBackStack(null).commit();
     }
 
     private void startSmartConfig(String ssid, String password) {

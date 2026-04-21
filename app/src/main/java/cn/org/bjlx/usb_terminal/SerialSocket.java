@@ -16,7 +16,7 @@ import com.hoho.android.usbserial.util.SerialInputOutputManager;
 import java.io.IOException;
 import java.security.InvalidParameterException;
 
-public class SerialSocket implements SerialInputOutputManager.Listener {
+public class SerialSocket implements SerialInputOutputManager.Listener, TerminalSocket {
 
     private static final int WRITE_WAIT_MILLIS = 200; // 0 blocked infinitely on unprogrammed arduino
     private final static String TAG = SerialSocket.class.getSimpleName();
@@ -45,9 +45,9 @@ public class SerialSocket implements SerialInputOutputManager.Listener {
         };
     }
 
-    String getName() { return serialPort.getDriver().getClass().getSimpleName().replace("SerialDriver",""); }
+    public String getName() { return serialPort.getDriver().getClass().getSimpleName().replace("SerialDriver",""); }
 
-    void connect(SerialListener listener) throws IOException {
+    public void connect(SerialListener listener) throws IOException {
         this.listener = listener;
         ContextCompat.registerReceiver(context, disconnectBroadcastReceiver, new IntentFilter(Constants.INTENT_ACTION_DISCONNECT), ContextCompat.RECEIVER_NOT_EXPORTED);
 	try {
@@ -60,7 +60,7 @@ public class SerialSocket implements SerialInputOutputManager.Listener {
         ioManager.start();
     }
 
-    void disconnect() {
+    public void disconnect() {
         listener = null; // ignore remaining data and errors
         if (ioManager != null) {
             ioManager.setListener(null);
@@ -89,7 +89,7 @@ public class SerialSocket implements SerialInputOutputManager.Listener {
         }
     }
 
-    void write(byte[] data) throws IOException {
+    public void write(byte[] data) throws IOException {
         if(serialPort == null)
             throw new IOException("not connected");
         serialPort.write(data, WRITE_WAIT_MILLIS);

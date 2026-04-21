@@ -21,8 +21,8 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 
 /**
- * create notification and queue serial data while activity is not in the foreground
- * use listener chain: SerialSocket -> SerialService -> UI fragment
+ * create notification and queue terminal data while activity is not in the foreground
+ * use listener chain: TerminalSocket -> SerialService -> UI fragment
  */
 public class SerialService extends Service implements SerialListener {
 
@@ -50,7 +50,7 @@ public class SerialService extends Service implements SerialListener {
     private final ArrayDeque<QueueItem> queue1, queue2;
     private final QueueItem lastRead;
 
-    private SerialSocket socket;
+    private TerminalSocket socket;
     private SerialListener listener;
     private boolean connected;
 
@@ -91,7 +91,7 @@ public class SerialService extends Service implements SerialListener {
     /**
      * Api
      */
-    public void connect(SerialSocket socket) throws IOException {
+    public void connect(TerminalSocket socket) throws IOException {
         socket.connect(this);
         this.socket = socket;
         connected = true;

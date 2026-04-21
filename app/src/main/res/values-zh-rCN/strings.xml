@@ -30,6 +30,8 @@
     <string name="menu_control_lines">控制线</string>
     <string name="menu_background_notification">应用在后台时显示通知</string>
     <string name="menu_send_break">发送 BREAK</string>
+    <string name="menu_reconnect">Telnet 重连</string>
+    <string name="menu_telnet_client">Telnet 客户端</string>
     <string name="menu_language">语言</string>
     <string name="label_no_driver">&lt;无驱动&gt;</string>
     <string name="label_no_usb_devices_found">&lt;未找到 USB 设备&gt;</string>
@@ -81,7 +83,13 @@
     <string name="dialog_smart_config_ssid">Wi‑Fi 名称</string>
     <string name="dialog_smart_config_password">Wi‑Fi 密码</string>
     <string name="dialog_smart_config_start">开始</string>
+    <string name="dialog_telnet_title">Telnet 客户端</string>
+    <string name="dialog_telnet_host">IP 或主机名</string>
+    <string name="dialog_telnet_port">端口</string>
+    <string name="dialog_telnet_connect">连接</string>
     <string name="status_smart_config_ssid_required">SSID 不能为空。</string>
+    <string name="status_telnet_host_required">IP 或主机名不能为空。</string>
+    <string name="status_telnet_port_invalid">端口必须在 1 到 65535 之间。</string>
     <string name="status_smart_config_busy">ESP SmartConfig 已在进行中</string>
     <string name="status_smart_config_starting">正在为 SSID 启动 SmartConfig：%1$s</string>
     <string name="status_smart_config_running">SmartConfig 进行中，请让手机靠近路由器和 ESP 设备。</string>

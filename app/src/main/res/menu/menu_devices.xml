@@ -11,6 +11,9 @@
         android:id="@+id/smartConfigEsp32"
         android:title="@string/menu_smart_config_esp32" />
     <item
+        android:id="@+id/telnetClient"
+        android:title="@string/menu_telnet_client" />
+    <item
         android:id="@+id/shareLatestLog"
         android:title="@string/logs_open"
         app:showAsAction="never" />

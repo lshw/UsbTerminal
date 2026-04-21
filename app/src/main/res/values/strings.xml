@@ -30,6 +30,8 @@
     <string name="menu_control_lines">Control Lines</string>
     <string name="menu_background_notification">Notification if app in background</string>
     <string name="menu_send_break">Send BREAK</string>
+    <string name="menu_reconnect">Reconnect Telnet</string>
+    <string name="menu_telnet_client">Telnet Client</string>
     <string name="menu_smart_config_esp32">ESP SmartConfig 配网</string>
     <string name="menu_language">Language</string>
     <string name="label_no_driver">&lt;no driver&gt;</string>
@@ -52,6 +54,8 @@
     <string name="status_connected">Connected</string>
     <string name="status_connection_failed">Connection failed: %1$s</string>
     <string name="status_connection_lost">Connection lost: %1$s</string>
+    <string name="status_telnet_host_required">IP or host cannot be empty.</string>
+    <string name="status_telnet_port_invalid">Port must be between 1 and 65535.</string>
     <string name="status_set_flow_control_failed">Set flow control failed: %1$s %2$s</string>
     <string name="status_get_supported_control_lines_failed">getSupportedControlLines() failed: %1$s</string>
     <string name="status_get_control_lines_failed">getControlLines() failed: %1$s - stopped control line refresh</string>
@@ -64,6 +68,10 @@
     <string name="dialog_smart_config_ssid">Wi‑Fi SSID</string>
     <string name="dialog_smart_config_password">Wi‑Fi Password</string>
     <string name="dialog_smart_config_start">Start</string>
+    <string name="dialog_telnet_title">Telnet Client</string>
+    <string name="dialog_telnet_host">IP or Hostname</string>
+    <string name="dialog_telnet_port">Port</string>
+    <string name="dialog_telnet_connect">Connect</string>
     <string name="comm_param_baud_rate">Baud rate</string>
     <string name="comm_param_data_bits">Data bits</string>
     <string name="comm_param_parity">Parity</string>
