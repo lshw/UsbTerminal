@@ -4,7 +4,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
-import android.content.pm.PackageManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -90,7 +89,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private static final int RECEIVE_RENDER_INTERVAL_MS = 33;
     private static final int RECEIVE_RENDER_MAX_BYTES = 16 * 1024;
     private static final int RECEIVE_IMMEDIATE_DRAIN_THRESHOLD = 64 * 1024;
-    private static final int SMART_CONFIG_PERMISSION_REQUEST_CODE = 2001;
+    private static final String SMART_CONFIG_BSSID = "00:00:00:00:00:00";
     private final Handler mainLooper;
     private final BroadcastReceiver broadcastReceiver;
     private int deviceId, vendorId, productId, portNum, baudRate, dataBits, parity, stopBits;
@@ -121,7 +120,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private long lastHexToggleAtMillis;
     private boolean replaceableFlashStatusLine;
     private boolean smartConfigInProgress;
-    private boolean pendingSmartConfigDialogAfterPermission;
     private volatile IEsptouchTask smartConfigTask;
     private final AtomicBoolean smartConfigCompletionHandled = new AtomicBoolean();
     private boolean smartConfigCancelledByUser;
@@ -432,13 +430,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 status(getString(R.string.status_smart_config_busy));
                 return true;
             }
-            if (!ensureSmartConfigPermission()) {
-                pendingSmartConfigDialogAfterPermission = true;
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        SMART_CONFIG_PERMISSION_REQUEST_CODE);
-                status(getString(R.string.status_smart_config_permission_required));
-                return true;
-            }
             showSmartConfigDialog();
             return true;
         } else if (id == R.id.about) {
@@ -579,21 +570,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void showSmartConfigDialog() {
-        String ssid = getConnectedWifiSsid();
-        if (TextUtils.isEmpty(ssid)) {
-            status(getString(R.string.status_smart_config_wifi_unavailable));
-            return;
-        }
-        if (isConnectedWifi5G()) {
-            status(getString(R.string.status_smart_config_wifi_5g));
-            return;
-        }
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_smart_config, null, false);
         EditText ssidView = dialogView.findViewById(R.id.smart_config_ssid);
         EditText passwordView = dialogView.findViewById(R.id.smart_config_password);
         String lastPassword = SmartConfigSessionState.getLastPassword();
-        ssidView.setText(ssid);
-        ssidView.setSelection(ssid.length());
         if (lastPassword != null) {
             passwordView.setText(lastPassword);
             passwordView.setSelection(lastPassword.length());
@@ -625,11 +605,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             status(getString(R.string.status_smart_config_busy));
             return;
         }
-        String bssid = getConnectedWifiBssid();
-        if (TextUtils.isEmpty(bssid)) {
-            status(getString(R.string.status_smart_config_bssid_unavailable));
-            return;
-        }
         smartConfigInProgress = true;
         smartConfigCancelledByUser = false;
         smartConfigCompletionHandled.set(false);
@@ -638,7 +613,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         status(getString(R.string.status_smart_config_running));
         showSmartConfigProgressDialog();
         Context appContext = requireContext().getApplicationContext();
-        new Thread(() -> runSmartConfig(appContext, ssid, bssid, password), "esp32-smart-config").start();
+        new Thread(() -> runSmartConfig(appContext, ssid, SMART_CONFIG_BSSID, password), "esp-smart-config").start();
     }
 
     private void runSmartConfig(Context context, String ssid, String bssid, String password) {
@@ -1321,17 +1296,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if (requestCode == SMART_CONFIG_PERMISSION_REQUEST_CODE) {
-            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
-            boolean reopenDialog = pendingSmartConfigDialogAfterPermission && granted;
-            pendingSmartConfigDialogAfterPermission = false;
-            if (reopenDialog) {
-                showSmartConfigDialog();
-            } else if (!granted) {
-                status(getString(R.string.status_smart_config_permission_denied));
-            }
-            return;
-        }
         if(Arrays.equals(permissions, new String[]{Manifest.permission.POST_NOTIFICATIONS}) &&
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !service.areNotificationsEnabled())
             showNotificationSettings();

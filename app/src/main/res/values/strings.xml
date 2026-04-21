@@ -60,7 +60,7 @@
     <string name="toast_no_driver">No driver</string>
     <string name="dialog_baud_rate">Communication settings</string>
     <string name="dialog_smart_config_title">ESP SmartConfig</string>
-    <string name="dialog_smart_config_hint">手机需连接到目标 2.4 GHz Wi‑Fi，ESP 设备需已进入 SmartConfig 模式。</string>
+    <string name="dialog_smart_config_hint">Manually enter the target Wi‑Fi SSID and password. The ESP device must already be in SmartConfig mode.</string>
     <string name="dialog_smart_config_ssid">Wi‑Fi SSID</string>
     <string name="dialog_smart_config_password">Wi‑Fi Password</string>
     <string name="dialog_smart_config_start">Start</string>
@@ -77,11 +77,6 @@
     <string name="notification_background_service">Background Service</string>
     <string name="notification_disconnect">Disconnect</string>
     <string name="status_flash_reconnect">Reconnecting serial terminal</string>
-    <string name="status_smart_config_permission_required">SmartConfig requires location permission to read the current Wi‑Fi SSID.</string>
-    <string name="status_smart_config_permission_denied">SmartConfig was cancelled because location permission was denied.</string>
-    <string name="status_smart_config_wifi_unavailable">Current Wi‑Fi information is unavailable. Connect the phone to the target Wi‑Fi first.</string>
-    <string name="status_smart_config_wifi_5g">Current Wi‑Fi is not 2.4 GHz. Standard ESP SmartConfig usually requires 2.4 GHz.</string>
-    <string name="status_smart_config_bssid_unavailable">Current Wi‑Fi BSSID is unavailable. Retry after reconnecting Wi‑Fi.</string>
     <string name="status_smart_config_ssid_required">SSID cannot be empty.</string>
     <string name="status_smart_config_busy">ESP SmartConfig is already running</string>
     <string name="status_smart_config_starting">Starting SmartConfig for SSID: %1$s</string>

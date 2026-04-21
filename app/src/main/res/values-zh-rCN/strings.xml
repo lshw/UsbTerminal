@@ -77,15 +77,10 @@
     <string name="language_japanese">日本語</string>
     <string name="menu_smart_config_esp32">ESP SmartConfig 配网</string>
     <string name="dialog_smart_config_title">ESP SmartConfig</string>
-    <string name="dialog_smart_config_hint">手机需连接到目标 2.4 GHz Wi‑Fi，ESP 设备需已进入 SmartConfig 模式。</string>
+    <string name="dialog_smart_config_hint">手动输入目标 Wi‑Fi 的 SSID 和密码，ESP 设备需已进入 SmartConfig 模式。</string>
     <string name="dialog_smart_config_ssid">Wi‑Fi 名称</string>
     <string name="dialog_smart_config_password">Wi‑Fi 密码</string>
     <string name="dialog_smart_config_start">开始</string>
-    <string name="status_smart_config_permission_required">SmartConfig 需要定位权限来读取当前 Wi‑Fi 名称。</string>
-    <string name="status_smart_config_permission_denied">由于定位权限被拒绝，SmartConfig 已取消。</string>
-    <string name="status_smart_config_wifi_unavailable">无法读取当前 Wi‑Fi 信息，请先让手机连接目标 Wi‑Fi。</string>
-    <string name="status_smart_config_wifi_5g">当前 Wi‑Fi 不是 2.4 GHz，标准 ESP SmartConfig 通常要求 2.4 GHz。</string>
-    <string name="status_smart_config_bssid_unavailable">无法读取当前 Wi‑Fi 的 BSSID，请重新连接 Wi‑Fi 后再试。</string>
     <string name="status_smart_config_ssid_required">SSID 不能为空。</string>
     <string name="status_smart_config_busy">ESP SmartConfig 已在进行中</string>
     <string name="status_smart_config_starting">正在为 SSID 启动 SmartConfig：%1$s</string>
